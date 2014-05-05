@@ -1,4 +1,4 @@
 #!/bin/bash
-cd /go/github.com/boourns/incredible
+cd /go/src/github.com/boourns/incredible
 ./incredible
 
