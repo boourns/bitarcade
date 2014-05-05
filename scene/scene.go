@@ -19,6 +19,7 @@ type Scene struct {
 
 type Box struct {
 	X, Y, A vect.Float
+        Color string
 }
 
 type Line struct {
@@ -77,7 +78,7 @@ func (s *Scene) Render() ([]byte, error) {
 	boxes := make([]Box, len(s.balls))
 
 	for i, x := range s.balls {
-		boxes[i] = Box{x.Body.Position().X, x.Body.Position().Y, x.Body.Angle()}
+		boxes[i] = Box{x.Body.Position().X, x.Body.Position().Y, x.Body.Angle(), "#00ee00"}
 	}
 
 	lines := make([]Line, len(s.staticLines))

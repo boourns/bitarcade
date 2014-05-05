@@ -16,6 +16,22 @@ $(function() {
         if (doScroll) {
             d.scrollTop = d.scrollHeight - d.clientHeight;
         }
+}
+
+     function drawScreen(data) {
+        var canvas = document.getElementById('screen');
+	var context = canvas.getContext('2d');
+	context.clearRect(0, 0, canvas.width, canvas.height);
+
+	for (i = 0; i < data.boxes.length; ++i) {
+	  	context.beginPath();
+     	 	context.arc(data.boxes[i].X, 600-data.boxes[i].Y, 25, 0, 2 * Math.PI, false);
+ 		context.fillStyle = "green";
+ 		context.fill();
+      		context.lineWidth = 5;
+     		context.strokeStyle = '#003300';
+      		context.stroke();	
+	}
     }
 
     if (window["WebSocket"]) {
@@ -25,6 +41,7 @@ $(function() {
         }
         conn.onmessage = function(evt) {
 		console.log(evt.data);
+		drawScreen(JSON.parse(evt.data));
         }
     } else {
         appendLog($("<div><b>Your browser does not support WebSockets.</b></div>"))
@@ -33,5 +50,7 @@ $(function() {
 </script>
 
 <body>
+
+<canvas id="screen" width="600" height="600"></canvas>
 <div id="log"></div>
 </body>

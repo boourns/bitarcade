@@ -4,15 +4,15 @@ import (
 	"github.com/boourns/incredible/scene"
 	"github.com/boourns/mux"
 	"github.com/gorilla/websocket"
-	"time"
-	"net/http"
-	"log"
 	"html/template"
+	"log"
 	"math/rand"
+	"net/http"
+	"time"
 )
 
 var players *mux.Mux
-var world   *scene.Scene
+var world *scene.Scene
 
 // boring consts for websocket
 const (
@@ -29,15 +29,22 @@ const (
 	maxMessageSize = 512
 )
 
-var timeToNextBall = 1000
+var timeToNextBall = 100
+
+type event map[string]string
 
 func eventHandler(input interface{}) []interface{} {
+	/*ev, ok := input.(event)
+	        if !ok {
+		  return nil
+	        }*/
+
 	output := make([]interface{}, 0)
 
 	timeToNextBall--
 	if timeToNextBall <= 0 {
-		world.AddBall(rand.Int() % 600, rand.Int() % 300 + 300)
-		timeToNextBall = 1000
+		world.AddBall(rand.Int()%600, rand.Int()%300+300)
+		timeToNextBall = 100
 	}
 
 	world.Step(1.0 / 60.0)
@@ -49,7 +56,7 @@ func eventHandler(input interface{}) []interface{} {
 func main() {
 	world = scene.New()
 	for i := 0; i < 20; i++ {
-		world.AddBall(rand.Int() % 600, rand.Int() % 300 + 300)
+		world.AddBall(rand.Int()%600, rand.Int()%300+300)
 	}
 
 	players = mux.New(eventHandler)
@@ -92,9 +99,10 @@ func playerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for true {
 		select {
-		case payload := <- stateReceiver:
+		case payload := <-stateReceiver:
+			msg, _ := payload.(string)
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			ws.WriteMessage(websocket.TextMessage, []byte(mux.String(payload)))
+			ws.WriteMessage(websocket.TextMessage, []byte(msg))
 		}
 	}
 }
@@ -113,4 +121,3 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	homeTempl.Execute(w, r.Host)
 }
-
