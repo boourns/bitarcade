@@ -1,18 +1,69 @@
 package main
 
 import (
-	"github.com/boourns/incredible/scene"
-	"github.com/boourns/mux"
+	"encoding/json"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"html/template"
 	"log"
-	"math/rand"
 	"net/http"
+	"strconv"
 	"time"
 )
 
-var players *mux.Mux
-var world *scene.Scene
+type Player struct {
+	Position Position
+	Keys     map[int]bool
+	State    int
+	Return   chan string
+}
+
+type Position struct {
+	X         int
+	Y         int
+	Direction float64
+	Size      int
+	Speed     float64
+}
+
+var PlayerCount = 0
+
+type Environment struct {
+	Players map[int]Player
+	Bullets []Position
+}
+
+type SerializedEnvironment struct {
+	Players []Position
+	Bullets []Position
+}
+
+var World Environment
+
+const (
+	JOIN    = iota
+	KEYDOWN = iota
+	KEYUP   = iota
+	QUIT    = iota
+	TIMER   = iota
+)
+
+const (
+	GAMEOVER = iota
+	PLAYING  = iota
+)
+
+type Event struct {
+	Player int
+	Type   int
+	Code   int
+	Return chan string
+}
+
+type InputEvent struct {
+	Code int
+	Down bool
+}
 
 // boring consts for websocket
 const (
@@ -29,46 +80,63 @@ const (
 	maxMessageSize = 512
 )
 
-var timeToNextBall = 100
+func eventHandler(events chan Event) {
+	for true {
+		select {
+		case input := <-events:
+			switch input.Type {
+			case KEYUP:
+				fmt.Printf("Player %d key %d up", input.Player, input.Code)
+				World.Players[input.Player].Keys[input.Code] = false
+			case KEYDOWN:
+				fmt.Printf("Player %d key %d down", input.Player, input.Code)
+				World.Players[input.Player].Keys[input.Code] = true
+			case JOIN:
+				newPlayer := PlayerCount
+				PlayerCount++
+				fmt.Printf("Player %d Joined\n", newPlayer)
+				World.Players[newPlayer] = Player{
+					State:  GAMEOVER,
+					Return: input.Return,
+					Keys:   make(map[int]bool, 0),
+				}
+				input.Return <- fmt.Sprintf("%d", newPlayer)
+			case QUIT:
+				delete(World.Players, input.Player)
+			case TIMER:
+				data := SerializedEnvironment{
+					Bullets: World.Bullets,
+				}
+				for _, v := range World.Players {
+					data.Players = append(data.Players, v.Position)
+				}
+				state, err := json.Marshal(data)
+				if err != nil {
+					fmt.Printf("Error marshalling world: %v", err)
+				}
 
-type event map[string]string
-
-func eventHandler(input interface{}) []interface{} {
-	/*ev, ok := input.(event)
-	        if !ok {
-		  return nil
-	        }*/
-
-	output := make([]interface{}, 0)
-
-	timeToNextBall--
-	if timeToNextBall <= 0 {
-		world.AddBall(rand.Int()%600, rand.Int()%300+300)
-		timeToNextBall = 100
+				for _, v := range World.Players {
+					v.Return <- string(state)
+				}
+			}
+		}
 	}
-
-	world.Step(1.0 / 60.0)
-	state, _ := world.Render()
-	output = append(output, string(state))
-	return output
 }
 
+var events chan Event
+
 func main() {
-	world = scene.New()
-	for i := 0; i < 20; i++ {
-		world.AddBall(rand.Int()%600, rand.Int()%300+300)
-	}
+	events = make(chan Event, 0)
+	World.Players = make(map[int]Player)
 
-	players = mux.New(eventHandler)
+	go eventHandler(events)
 
-	timer := make(chan interface{}, 1)
-	go func(timer chan interface{}) {
+	go func(timer chan Event) {
 		for true {
-			time.Sleep(17 * time.Millisecond)
-			timer <- "tick"
+			time.Sleep(1700 * time.Millisecond)
+			timer <- Event{Type: TIMER}
 		}
-	}(timer)
-	players.AddInput(timer)
+	}(events)
 
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", playerHandler)
@@ -86,9 +154,18 @@ func playerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stateReceiver := make(chan interface{}, 1)
-	players.AddOutput(stateReceiver)
-	defer players.RemoveOutput(stateReceiver)
+	receiver := make(chan string, 0)
+	events <- Event{Type: JOIN, Return: receiver}
+	response := <-receiver
+
+	playerId, _ := strconv.ParseInt(response, 10, 32)
+
+	defer func() {
+		events <- Event{
+			Type:   QUIT,
+			Player: int(playerId),
+		}
+	}()
 
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -97,12 +174,42 @@ func playerHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	reader := make(chan InputEvent, 0)
+
+	ws.SetReadLimit(maxMessageSize)
+	ws.SetReadDeadline(time.Now().Add(pongWait))
+	ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+
+	go func(reader chan InputEvent) {
+		for {
+			_, message, err := ws.ReadMessage()
+			if err != nil {
+				ws.Close()
+				break
+			}
+			var ev InputEvent
+			err = json.Unmarshal(message, &ev)
+			if err != nil {
+				fmt.Printf("failed to unmarshal input: %s", err)
+			}
+			reader <- ev
+		}
+	}(reader)
+
 	for true {
 		select {
-		case payload := <-stateReceiver:
-			msg, _ := payload.(string)
+		case payload := <-receiver:
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			ws.WriteMessage(websocket.TextMessage, []byte(msg))
+			ws.WriteMessage(websocket.TextMessage, []byte(payload))
+		case input := <-reader:
+			ev := Event{Player: int(playerId), Code: input.Code}
+			if input.Down {
+				ev.Type = KEYDOWN
+			} else {
+				ev.Type = KEYUP
+			}
+			events <- ev
 		}
 	}
 }
