@@ -4,6 +4,7 @@
 <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
 <script>
   var conn;
+  var worldData;
 
   function sendKey(code, down) {
     if ((code >= 37 && code <= 40) || code == 32) {
@@ -15,6 +16,8 @@
   }
 
   $(function() {
+
+    $("body").css('overflow', 'hidden');
 
     $(document).bind('keydown', function (evt){
       if (sendKey(evt.keyCode, true)) {
@@ -28,32 +31,59 @@
       }
     });
 
-    function drawScreen(data) {
+    function drawScreen(timestamp) {
+      data = worldData;
+      if (data === undefined) {
+        window.requestAnimationFrame(drawScreen);
+        return
+      }
+
       var canvas = document.getElementById('screen');
       var ctx = canvas.getContext('2d');
       ctx.fillStyle="black";
       ctx.fillRect(0,0,640,480);
 
-      for (i = 0; i < data.ships.length; ++i) {
-        context.beginPath();
-        context.arc(data.boxes[i].X, 640-data.boxes[i].Y, 5, 0, 2 * Math.PI, false);
-        context.fillStyle = "green";
-        context.fill();
-        context.lineWidth = 5;
-        context.strokeStyle = '#003300';
-        context.stroke();	
+      for (i = 0; i < data.Players.length; ++i) {
+        ctx.beginPath();
+        ship = data.Players[i];
+
+        point1x = ship.X + 10 * (Math.sin(ship.Direction));
+        point1y = ship.Y + 10 * (Math.cos(ship.Direction));
+        point2x = ship.X - 10 * (Math.sin(ship.Direction + 0.35));
+        point2y = ship.Y - 15 * (Math.cos(ship.Direction + 0.35));
+        point3x = ship.X - 10 * (Math.sin(ship.Direction - 0.35));
+        point3y = ship.Y - 15 * (Math.cos(ship.Direction - 0.35));
+
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#00AA00';
+
+        ctx.moveTo(point1x, point1y);
+        ctx.lineTo(point2x, point2y);
+        ctx.lineTo(point3x, point3y);
+        ctx.lineTo(point1x, point1y);
+        ctx.stroke();	
+
       }
+      window.requestAnimationFrame(drawScreen);
     }
 
     if (window["WebSocket"]) {
       conn = new WebSocket("ws://{{$}}/ws");
       conn.onclose = function(evt) {
+        debugger
         console.log("<div><b>Connection closed.</b></div>")
       }
       conn.onmessage = function(evt) {
-        //        drawScreen(JSON.parse(evt.data));
-        console.log(evt.data)
+        worldData = JSON.parse(evt.data);
       }
+      conn.onerror = function(evt) {
+        debugger
+      }
+      window.setInterval(function() {
+        conn.send("PONG")
+      }, 5000)
+
+      window.requestAnimationFrame(drawScreen);
     }
   });
 </script>
