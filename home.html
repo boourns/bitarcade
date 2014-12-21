@@ -5,6 +5,7 @@
 <script>
   var conn;
   var worldData;
+  var deadLastFrame = true;
 
   function sendKey(code, down) {
     if ((code >= 37 && code <= 40) || code == 32) {
@@ -31,13 +32,12 @@
       }
     });
 
-    function drawScreen(timestamp) {
-      data = worldData;
-      if (data === undefined) {
-        window.requestAnimationFrame(drawScreen);
-        return
-      }
+    function drawDead() {
+      $('#screen').hide();
+      $('#dead').show();
+    }
 
+    function drawGame() {
       var canvas = document.getElementById('screen');
       var ctx = canvas.getContext('2d');
       ctx.fillStyle="black";
@@ -62,8 +62,46 @@
         ctx.lineTo(point3x, point3y);
         ctx.lineTo(point1x, point1y);
         ctx.stroke();	
-
       }
+      for (i = 0; i < data.Bullets.length; ++i) {
+        ctx.beginPath();
+        bullet = data.Bullets[i].Position;
+
+        point1x = bullet.X;
+        point1y = bullet.Y;
+        point2x = bullet.X + 5 * (Math.sin(bullet.Direction));
+        point2y = bullet.Y + 5 * (Math.cos(bullet.Direction));
+
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#00FF00';
+
+        ctx.moveTo(point1x, point1y);
+        ctx.lineTo(point2x, point2y);
+        ctx.stroke();	
+      }
+
+    }
+
+    function drawScreen(timestamp) {
+      data = worldData;
+      if (data === undefined) {
+        drawDead();
+        window.requestAnimationFrame(drawScreen);
+        return
+      }
+
+      if (data.Playing == true) {
+        if (deadLastFrame == true) {
+          $('#dead').hide();
+          $('#screen').show();
+        }
+        drawGame()
+        deadLastFrame = false;
+      } else {
+        drawDead()
+        deadLastFrame = true;
+      }
+
       window.requestAnimationFrame(drawScreen);
     }
 
@@ -91,4 +129,6 @@
 <body>
 
   <canvas id="screen" width="640" height="480" style="width:100%; height: 100%"></canvas>
+
+  <div id="gameover"><p>Game over!</div>
 </body>

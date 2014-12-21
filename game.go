@@ -4,14 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"time"
 )
-
-type Player struct {
-	Position Position
-	Keys     map[int]bool
-	State    int
-	Return   chan string
-}
 
 type Position struct {
 	X         int
@@ -22,16 +16,29 @@ type Position struct {
 	SpeedY    float64
 }
 
+type Player struct {
+	Position Position
+	Keys     map[int]bool
+	State    int
+	Return   chan string
+}
+
+type Bullet struct {
+	Position *Position
+	EndTime  int64
+}
+
 var PlayerCount = 0
 
 type Environment struct {
 	Players map[int]*Player
-	Bullets []*Position
+	Bullets []*Bullet
 }
 
 type SerializedEnvironment struct {
+	Playing bool
 	Players []*Position
-	Bullets []*Position
+	Bullets []*Bullet
 }
 
 var World Environment
@@ -82,7 +89,6 @@ func eventHandler(events chan Event) {
 			case QUIT:
 				delete(World.Players, input.Player)
 			case TIMER:
-
 				for _, v := range World.Players {
 					throttle := 0.0
 					x := v.Position.SpeedX
@@ -100,6 +106,24 @@ func eventHandler(events chan Event) {
 								v.Position.Direction += (0.5 * (0.1 + curSpeed/20.0))
 							case RIGHT:
 								v.Position.Direction -= (0.5 * (0.1 + curSpeed/20.0))
+							case SPACE:
+								if v.State == GAMEOVER {
+									v.State = PLAYING
+								} else {
+									newBullet := &Bullet{
+										Position: &Position{
+											Direction: v.Position.Direction,
+											X:         v.Position.X,
+											Y:         v.Position.Y,
+										},
+										EndTime: time.Now().Unix() + 10,
+									}
+									x, y = math.Sincos(newBullet.Position.Direction)
+									newBullet.Position.SpeedX = x * 20.0
+									newBullet.Position.SpeedY = y * 20.0
+
+									World.Bullets = append(World.Bullets, newBullet)
+								}
 							}
 						}
 					}
@@ -120,21 +144,20 @@ func eventHandler(events chan Event) {
 						v.Position.SpeedY = -10.0
 					}
 
-					v.Position.X += int(v.Position.SpeedX)
-					v.Position.Y += int(v.Position.SpeedY)
-					for v.Position.X > 640 {
-						v.Position.X -= 640
-					}
-					for v.Position.Y > 480 {
-						v.Position.Y -= 480
-					}
-					for v.Position.X < 0 {
-						v.Position.X += 640
-					}
-					for v.Position.Y < 0 {
-						v.Position.Y += 480
-					}
+					v.Position.Adjust()
 				}
+
+				newBullets := []*Bullet{}
+				now := time.Now().Unix()
+
+				for _, v := range World.Bullets {
+					if v.EndTime > now {
+						newBullets = append(newBullets, v)
+					}
+					v.Position.Adjust()
+				}
+
+				World.Bullets = newBullets
 
 				data := SerializedEnvironment{
 					Bullets: World.Bullets,
@@ -142,16 +165,34 @@ func eventHandler(events chan Event) {
 				for _, v := range World.Players {
 					data.Players = append(data.Players, &v.Position)
 				}
-				state, err := json.Marshal(data)
-				if err != nil {
-					fmt.Printf("Error marshalling world: %v", err)
-				}
 				for _, v := range World.Players {
+					data.Playing = (v.State != GAMEOVER)
+					state, err := json.Marshal(data)
+					if err != nil {
+						fmt.Printf("Error marshalling world: %v", err)
+					}
 					go func(state []byte) {
 						v.Return <- string(state)
 					}(state)
 				}
 			}
 		}
+	}
+}
+
+func (p *Position) Adjust() {
+	p.X += int(p.SpeedX)
+	p.Y += int(p.SpeedY)
+	for p.X > 640 {
+		p.X -= 640
+	}
+	for p.Y > 480 {
+		p.Y -= 480
+	}
+	for p.X < 0 {
+		p.X += 640
+	}
+	for p.Y < 0 {
+		p.Y += 480
 	}
 }
