@@ -17,10 +17,16 @@ type Position struct {
 }
 
 type Player struct {
-	Position Position
-	Keys     map[int]bool
-	State    int
-	Return   chan string
+	Id               int
+	Position         Position
+	State            int
+	InvincibleFrames uint
+}
+
+type PlayerContext struct {
+	Player *Player
+	Keys   map[int]bool
+	Return chan string
 }
 
 type Bullet struct {
@@ -31,14 +37,14 @@ type Bullet struct {
 var PlayerCount = 0
 
 type Environment struct {
-	Players map[int]*Player
+	Players map[int]*PlayerContext
 	Bullets []*Bullet
 }
 
 type SerializedEnvironment struct {
-	Playing bool
-	Players []*Position
-	Bullets []*Bullet
+	PlayerId int
+	Players  []*Player
+	Bullets  []*Bullet
 }
 
 var World Environment
@@ -79,20 +85,24 @@ func eventHandler(events chan Event) {
 				newPlayer := PlayerCount
 				PlayerCount++
 				fmt.Printf("Player %d Joined\n", newPlayer)
-				World.Players[newPlayer] = &Player{
-					State:    GAMEOVER,
-					Return:   input.Return,
-					Keys:     make(map[int]bool, 0),
-					Position: Position{X: 320, Y: 240, Size: 10},
+				World.Players[newPlayer] = &PlayerContext{
+					Player: &Player{
+						Id:       newPlayer,
+						State:    GAMEOVER,
+						Position: Position{X: 320, Y: 240, Size: 10},
+					},
+					Return: input.Return,
+					Keys:   make(map[int]bool, 0),
 				}
 				input.Return <- fmt.Sprintf("%d", newPlayer)
 			case QUIT:
 				delete(World.Players, input.Player)
 			case TIMER:
 				for _, v := range World.Players {
+					p := v.Player
 					throttle := 0.0
-					x := v.Position.SpeedX
-					y := v.Position.SpeedY
+					x := p.Position.SpeedX
+					y := p.Position.SpeedY
 
 					curSpeed := math.Sqrt(x*x + y*y)
 
@@ -103,18 +113,19 @@ func eventHandler(events chan Event) {
 							case UP:
 								throttle = 1.0
 							case LEFT:
-								v.Position.Direction += (0.5 * (0.1 + curSpeed/20.0))
+								p.Position.Direction += (0.5 * (0.1 + curSpeed/20.0))
 							case RIGHT:
-								v.Position.Direction -= (0.5 * (0.1 + curSpeed/20.0))
+								p.Position.Direction -= (0.5 * (0.1 + curSpeed/20.0))
 							case SPACE:
-								if v.State == GAMEOVER {
-									v.State = PLAYING
+								if p.State == GAMEOVER {
+									p.State = PLAYING
+									p.InvincibleFrames = 180
 								} else {
 									newBullet := &Bullet{
 										Position: &Position{
-											Direction: v.Position.Direction,
-											X:         v.Position.X,
-											Y:         v.Position.Y,
+											Direction: p.Position.Direction,
+											X:         p.Position.X,
+											Y:         p.Position.Y,
 										},
 										EndTime: time.Now().Unix() + 10,
 									}
@@ -127,24 +138,28 @@ func eventHandler(events chan Event) {
 							}
 						}
 					}
-					x, y = math.Sincos(v.Position.Direction)
-					v.Position.SpeedX += x * throttle
-					v.Position.SpeedY += y * throttle
+					x, y = math.Sincos(p.Position.Direction)
+					p.Position.SpeedX += x * throttle
+					p.Position.SpeedY += y * throttle
 
-					if v.Position.SpeedX > 10.0 {
-						v.Position.SpeedX = 10.0
+					if p.Position.SpeedX > 10.0 {
+						p.Position.SpeedX = 10.0
 					}
-					if v.Position.SpeedX < -10.0 {
-						v.Position.SpeedX = -10.0
+					if p.Position.SpeedX < -10.0 {
+						p.Position.SpeedX = -10.0
 					}
-					if v.Position.SpeedY > 10.0 {
-						v.Position.SpeedY = 10.0
+					if p.Position.SpeedY > 10.0 {
+						p.Position.SpeedY = 10.0
 					}
-					if v.Position.SpeedY < -10.0 {
-						v.Position.SpeedY = -10.0
+					if p.Position.SpeedY < -10.0 {
+						p.Position.SpeedY = -10.0
 					}
 
-					v.Position.Adjust()
+					p.Position.Adjust()
+
+					if p.InvincibleFrames > 0 {
+						p.InvincibleFrames--
+					}
 				}
 
 				newBullets := []*Bullet{}
@@ -154,6 +169,13 @@ func eventHandler(events chan Event) {
 					if v.EndTime > now {
 						newBullets = append(newBullets, v)
 					}
+
+					for _, p := range World.Players {
+						if distance(*v.Position, p.Player.Position) < 2.0 && p.Player.InvincibleFrames == 0 {
+							p.Player.State = GAMEOVER
+						}
+					}
+
 					v.Position.Adjust()
 				}
 
@@ -163,10 +185,10 @@ func eventHandler(events chan Event) {
 					Bullets: World.Bullets,
 				}
 				for _, v := range World.Players {
-					data.Players = append(data.Players, &v.Position)
+					data.Players = append(data.Players, v.Player)
 				}
-				for _, v := range World.Players {
-					data.Playing = (v.State != GAMEOVER)
+				for id, v := range World.Players {
+					data.PlayerId = id
 					state, err := json.Marshal(data)
 					if err != nil {
 						fmt.Printf("Error marshalling world: %v", err)
@@ -195,4 +217,10 @@ func (p *Position) Adjust() {
 	for p.Y < 0 {
 		p.Y += 480
 	}
+}
+
+func distance(a Position, b Position) float64 {
+	diffX := a.X - b.X
+	diffY := a.Y - b.Y
+	return math.Sqrt(float64((diffX * diffX) + (diffY * diffY)))
 }

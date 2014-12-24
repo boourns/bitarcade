@@ -1,7 +1,7 @@
 <head>
   <title>incredible2</title>
 </head>
-<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+<script src="jquery.min.js"></script>
 <script>
   var conn;
   var worldData;
@@ -32,6 +32,15 @@
       }
     });
 
+    function findPlayer(data) {
+      for (i = 0; i < data.Players.length; ++i) {
+        if (data.Players[i].Id == data.PlayerId) {
+          return data.Players[i]
+        }
+      }
+      return undefined
+    }
+
     function drawDead() {
       $('#screen').hide();
       $('#dead').show();
@@ -45,7 +54,7 @@
 
       for (i = 0; i < data.Players.length; ++i) {
         ctx.beginPath();
-        ship = data.Players[i];
+        ship = data.Players[i].Position;
 
         point1x = ship.X + 10 * (Math.sin(ship.Direction));
         point1y = ship.Y + 10 * (Math.cos(ship.Direction));
@@ -90,7 +99,9 @@
         return
       }
 
-      if (data.Playing == true) {
+      player = findPlayer(data)
+
+      if (player.State != 0) {
         if (deadLastFrame == true) {
           $('#dead').hide();
           $('#screen').show();

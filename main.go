@@ -8,7 +8,7 @@ import (
 
 func main() {
 	events = make(chan Event, 0)
-	World.Players = make(map[int]*Player)
+	World.Players = make(map[int]*PlayerContext)
 
 	go eventHandler(events)
 
@@ -21,5 +21,9 @@ func main() {
 
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", playerHandler)
+	http.HandleFunc("/jquery.min.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/jquery.min.js")
+	})
+
 	http.ListenAndServe("0.0.0.0:8080", nil)
 }
