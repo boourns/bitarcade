@@ -41,12 +41,11 @@
       return undefined
     }
 
-    function drawDead() {
-      $('#screen').hide();
-      $('#dead').show();
+    function drawDead(timestamp) {
+      $('#gameover').show();
     }
 
-    function drawGame() {
+    function drawGame(timestamp) {
       var canvas = document.getElementById('screen');
       var ctx = canvas.getContext('2d');
       ctx.fillStyle="black";
@@ -65,6 +64,12 @@
 
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#00AA00';
+
+        if (data.Players[i].InvincibleFrames > 0) {
+          if (timestamp % 120 < 60) {
+            ctx.strokeStyle = "#001100";
+          }
+        }
 
         ctx.moveTo(point1x, point1y);
         ctx.lineTo(point2x, point2y);
@@ -94,23 +99,24 @@
     function drawScreen(timestamp) {
       data = worldData;
       if (data === undefined) {
-        drawDead();
+        drawDead(timestamp);
         window.requestAnimationFrame(drawScreen);
         return
       }
 
       player = findPlayer(data)
 
-      if (player.State != 0) {
-        if (deadLastFrame == true) {
-          $('#dead').hide();
-          $('#screen').show();
-        }
-        drawGame()
-        deadLastFrame = false;
+      if (player == undefined) {
+        // connecting
       } else {
-        drawDead()
-        deadLastFrame = true;
+        if (player.State == 0) {
+          $('#gameover').show();
+          deadLastFrame = true
+        } else if (deadLastFrame == true) {
+          $('#gameover').hide();
+          deadLastFrame = false
+        }
+        drawGame(timestamp)
       }
 
       window.requestAnimationFrame(drawScreen);
@@ -138,8 +144,6 @@
 </script>
 
 <body>
-
-  <canvas id="screen" width="640" height="480" style="width:100%; height: 100%"></canvas>
-
-  <div id="gameover"><p>Game over!</div>
+  <div id="gameover" style="position:absolute; bottom-padding:50%; padding-left: 50%; width: 100%; height: 100%; background-color: rgba(0,0,0,0); color: #00FF00; z-index:10;"><p>Game over!</div>
+  <canvas id="screen" width="640" height="480" style="width:100%; height: 100%; z-index: 1;"></canvas>
 </body>

@@ -24,9 +24,10 @@ type Player struct {
 }
 
 type PlayerContext struct {
-	Player *Player
-	Keys   map[int]bool
-	Return chan string
+	Player        *Player
+	Keys          map[int]bool
+	Return        chan string
+	GameOverUntil int64
 }
 
 type Bullet struct {
@@ -91,35 +92,49 @@ func eventHandler(events chan Event) {
 						State:    GAMEOVER,
 						Position: Position{X: 320, Y: 240, Size: 10},
 					},
-					Return: input.Return,
-					Keys:   make(map[int]bool, 0),
+					Return:        input.Return,
+					Keys:          make(map[int]bool, 0),
+					GameOverUntil: time.Now().Unix() + 3,
 				}
 				input.Return <- fmt.Sprintf("%d", newPlayer)
 			case QUIT:
 				delete(World.Players, input.Player)
 			case TIMER:
-				for _, v := range World.Players {
-					p := v.Player
+				for _, pc := range World.Players {
+					p := pc.Player
 					throttle := 0.0
 					x := p.Position.SpeedX
 					y := p.Position.SpeedY
 
 					curSpeed := math.Sqrt(x*x + y*y)
 
-					for key, down := range v.Keys {
+					for key, down := range pc.Keys {
 						if down == true {
 							fmt.Printf("key %d is down!\n", key)
 							switch key {
 							case UP:
+								if p.State == GAMEOVER {
+									break
+								}
 								throttle = 1.0
 							case LEFT:
+								if p.State == GAMEOVER {
+									break
+								}
 								p.Position.Direction += (0.5 * (0.1 + curSpeed/20.0))
 							case RIGHT:
+								if p.State == GAMEOVER {
+									break
+								}
 								p.Position.Direction -= (0.5 * (0.1 + curSpeed/20.0))
 							case SPACE:
 								if p.State == GAMEOVER {
-									p.State = PLAYING
-									p.InvincibleFrames = 180
+									fmt.Printf("GameOverUntil %v Now %v\n", pc.GameOverUntil, time.Now().Unix())
+									if time.Now().Unix() > pc.GameOverUntil {
+										fmt.Printf("Playing now!\n")
+										p.State = PLAYING
+										p.InvincibleFrames = 180
+									}
 								} else {
 									newBullet := &Bullet{
 										Position: &Position{
@@ -170,9 +185,10 @@ func eventHandler(events chan Event) {
 						newBullets = append(newBullets, v)
 					}
 
-					for _, p := range World.Players {
-						if distance(*v.Position, p.Player.Position) < 2.0 && p.Player.InvincibleFrames == 0 {
-							p.Player.State = GAMEOVER
+					for _, pc := range World.Players {
+						if distance(*v.Position, pc.Player.Position) < 2.0 && pc.Player.InvincibleFrames == 0 {
+							pc.Player.State = GAMEOVER
+							pc.GameOverUntil = time.Now().Unix() + 3
 						}
 					}
 
