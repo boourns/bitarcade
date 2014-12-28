@@ -45,7 +45,7 @@
       $('#gameover').show();
     }
 
-    function drawGame(timestamp) {
+    function drawGame(player, timestamp) {
       var canvas = document.getElementById('screen');
       var ctx = canvas.getContext('2d');
       ctx.fillStyle="black";
@@ -116,7 +116,7 @@
           $('#gameover').hide();
           deadLastFrame = false
         }
-        drawGame(timestamp)
+        drawGame(player, timestamp)
       }
 
       window.requestAnimationFrame(drawScreen);

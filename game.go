@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+const (
+	SCREEN_WIDTH  = 640
+	SCREEN_HEIGHT = 480
+)
+
 type Position struct {
 	X         int
 	Y         int
@@ -157,6 +162,11 @@ func eventHandler(events chan Event) {
 					p.Position.SpeedX += x * throttle
 					p.Position.SpeedY += y * throttle
 
+					if p.State == GAMEOVER {
+						p.Position.SpeedX = 0.95 * p.Position.SpeedX
+						p.Position.SpeedY = 0.95 * p.Position.SpeedY
+					}
+
 					if p.Position.SpeedX > 10.0 {
 						p.Position.SpeedX = 10.0
 					}
@@ -221,17 +231,17 @@ func eventHandler(events chan Event) {
 func (p *Position) Adjust() {
 	p.X += int(p.SpeedX)
 	p.Y += int(p.SpeedY)
-	for p.X > 640 {
-		p.X -= 640
+	for p.X > SCREEN_WIDTH {
+		p.X -= SCREEN_WIDTH
 	}
-	for p.Y > 480 {
-		p.Y -= 480
+	for p.Y > SCREEN_HEIGHT {
+		p.Y -= SCREEN_HEIGHT
 	}
 	for p.X < 0 {
-		p.X += 640
+		p.X += SCREEN_WIDTH
 	}
 	for p.Y < 0 {
-		p.Y += 480
+		p.Y += SCREEN_HEIGHT
 	}
 }
 
