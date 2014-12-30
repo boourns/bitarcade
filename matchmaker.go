@@ -113,6 +113,7 @@ func serveMatchMaker(w http.ResponseWriter, r *http.Request) {
 	response := make(chan *MatchMakerEvent, 0)
 
 	playerToken, _ := getPlayerToken(w, r, true)
+	log.Printf("Player Token = %s", playerToken)
 
 	request := &MatchMakerEvent{
 		Type:        FIND_GAME,

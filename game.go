@@ -105,7 +105,7 @@ func (g *Game) eventHandler(events chan *Event) {
 				newPlayer := g.nextPlayerId
 				g.nextPlayerId++
 				g.PlayerCount++
-				fmt.Printf("Player %d Joined\n", newPlayer)
+				log.Printf("Player %d Joined (token %s)\n", newPlayer, input.PlayerToken)
 				g.Players[newPlayer] = &PlayerContext{
 					Player: &Player{
 						Id:       newPlayer,
@@ -121,16 +121,18 @@ func (g *Game) eventHandler(events chan *Event) {
 				log.Printf("Player connecting to game")
 				var playerContext *PlayerContext
 				for _, p := range g.Players {
+					log.Printf("Comparing player %s and %s", p.Token, input.PlayerToken)
 					if p.Token == input.PlayerToken {
 						playerContext = p
 					}
 				}
 				if playerContext == nil {
 					input.Return <- ""
+				} else {
+					playerContext.Player.State = GAMEOVER
+					playerContext.Return = input.Return
+					input.Return <- fmt.Sprintf("%d", playerContext.Player.Id)
 				}
-				playerContext.Player.State = GAMEOVER
-				playerContext.Return = input.Return
-				input.Return <- fmt.Sprintf("%d", playerContext.Player.Id)
 			case QUIT:
 				delete(g.Players, input.Player)
 				g.PlayerCount--

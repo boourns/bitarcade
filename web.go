@@ -62,6 +62,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	gameToken := params["game"][0]
 
 	playerToken, err := getPlayerToken(w, r, false)
+	log.Printf("Player Token = %s", playerToken)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%v", err), 500)
 		log.Printf("error getting player token")
@@ -88,7 +89,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	// connect to game
 	receiver := make(chan string, 0)
-	game.Events <- &Event{Type: CONNECT, Return: receiver}
+	game.Events <- &Event{Type: CONNECT, PlayerToken: playerToken, Return: receiver}
 	response := <-receiver
 	if response == "" {
 		http.Error(w, "Game: Not allowed", 401)
@@ -185,7 +186,9 @@ func getPlayerToken(w http.ResponseWriter, r *http.Request, saveSession bool) (t
 		HttpOnly: true,
 	}
 
-	if token, ok := session.Values["token"]; !ok {
+	var ok bool
+
+	if token, ok = session.Values["token"].(string); !ok {
 		if saveSession {
 			token = Token()
 			session.Values["token"] = token
