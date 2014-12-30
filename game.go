@@ -18,8 +18,8 @@ type Position struct {
 	Y         int
 	Direction float64
 	Size      int
-	SpeedX    float64
-	SpeedY    float64
+	SpeedX    float64 `json:"-"`
+	SpeedY    float64 `json:"-"`
 }
 
 type Player struct {
@@ -90,6 +90,31 @@ func newGame() *Game {
 	return ret
 }
 
+func (g *Game) handleJoin(input *Event) {
+	for id, player := range g.Players {
+		if player.Token == input.PlayerToken {
+			input.Return <- fmt.Sprintf("%d", id)
+			return
+		}
+	}
+
+	newPlayer := g.nextPlayerId
+	g.nextPlayerId++
+	g.PlayerCount++
+	log.Printf("Player %d Joined (token %s)\n", newPlayer, input.PlayerToken)
+	g.Players[newPlayer] = &PlayerContext{
+		Player: &Player{
+			Id:       newPlayer,
+			State:    DISCONNECTED,
+			Position: Position{X: 320, Y: 240, Size: 10},
+		},
+		Token:         input.PlayerToken,
+		Keys:          make(map[int]bool, 0),
+		GameOverUntil: time.Now().Unix() + 3,
+	}
+	input.Return <- fmt.Sprintf("%d", newPlayer)
+}
+
 func (g *Game) eventHandler(events chan *Event) {
 	for true {
 		select {
@@ -102,21 +127,7 @@ func (g *Game) eventHandler(events chan *Event) {
 				fmt.Printf("Player %d key %d down", input.Player, input.Code)
 				g.Players[input.Player].Keys[input.Code] = true
 			case JOIN:
-				newPlayer := g.nextPlayerId
-				g.nextPlayerId++
-				g.PlayerCount++
-				log.Printf("Player %d Joined (token %s)\n", newPlayer, input.PlayerToken)
-				g.Players[newPlayer] = &PlayerContext{
-					Player: &Player{
-						Id:       newPlayer,
-						State:    DISCONNECTED,
-						Position: Position{X: 320, Y: 240, Size: 10},
-					},
-					Token:         input.PlayerToken,
-					Keys:          make(map[int]bool, 0),
-					GameOverUntil: time.Now().Unix() + 3,
-				}
-				input.Return <- fmt.Sprintf("%d", newPlayer)
+				g.handleJoin(input)
 			case CONNECT:
 				log.Printf("Player connecting to game")
 				var playerContext *PlayerContext
@@ -251,9 +262,9 @@ func (g *Game) eventHandler(events chan *Event) {
 					if err != nil {
 						fmt.Printf("Error marshalling world: %v", err)
 					}
-					go func(state []byte) {
-						v.Return <- string(state)
-					}(state)
+					go func(output chan string, state []byte) {
+						output <- string(state)
+					}(v.Return, state)
 				}
 			}
 		}
