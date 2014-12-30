@@ -1,10 +1,11 @@
 <head>
   <title>incredible2</title>
 </head>
-<script src="jquery.min.js"></script>
+<script src="/jquery.min.js"></script>
 <script>
   var conn;
   var worldData;
+  var gameToken;
   var deadLastFrame = true;
 
   function sendKey(code, down) {
@@ -17,6 +18,8 @@
   }
 
   $(function() {
+    url = document.URL.split("/")
+    gameToken = url[url.length-1]
 
     $("body").css('overflow', 'hidden');
 
@@ -123,7 +126,7 @@
     }
 
     if (window["WebSocket"]) {
-      conn = new WebSocket("ws://{{$}}/ws");
+      conn = new WebSocket("ws://{{$}}/ws?game=" + gameToken);
       conn.onclose = function(evt) {
         debugger
         console.log("<div><b>Connection closed.</b></div>")

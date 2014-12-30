@@ -1,26 +1,19 @@
 package main
 
 import (
+	"github.com/gorilla/sessions"
 	"net/http"
 	_ "net/http/pprof"
-	"time"
 )
 
+var store = sessions.NewCookieStore([]byte("bcbce3d0e4aca94b769a4ae424ed0915"), []byte("9b1d10720c8416d195d22f6304be5b1a"))
+
 func main() {
-	events = make(chan Event, 0)
-	World.Players = make(map[int]*PlayerContext)
+	Matcher = NewMatchMaker()
 
-	go eventHandler(events)
-
-	go func(timer chan Event) {
-		for true {
-			time.Sleep(50 * time.Millisecond)
-			timer <- Event{Type: TIMER}
-		}
-	}(events)
-
-	http.HandleFunc("/", serveHome)
-	http.HandleFunc("/ws", playerHandler)
+	http.HandleFunc("/game/", serveGame)
+	http.HandleFunc("/", serveMatchMaker)
+	http.HandleFunc("/ws", websocketHandler)
 	http.HandleFunc("/jquery.min.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/jquery.min.js")
 	})

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"time"
 )
@@ -33,6 +34,7 @@ type PlayerContext struct {
 	Keys          map[int]bool
 	Return        chan string
 	GameOverUntil int64
+	Token         string
 }
 
 type Bullet struct {
@@ -40,23 +42,23 @@ type Bullet struct {
 	EndTime  int64
 }
 
-var PlayerCount = 0
-
-type Environment struct {
-	Players map[int]*PlayerContext
-	Bullets []*Bullet
+type Game struct {
+	Players      map[int]*PlayerContext
+	Bullets      []*Bullet
+	PlayerCount  int
+	Events       chan *Event
+	nextPlayerId int
 }
 
-type SerializedEnvironment struct {
+type SerializedGame struct {
 	PlayerId int
 	Players  []*Player
 	Bullets  []*Bullet
 }
 
-var World Environment
-
 const (
 	JOIN    = iota
+	CONNECT = iota
 	KEYDOWN = iota
 	KEYUP   = iota
 	QUIT    = iota
@@ -64,8 +66,9 @@ const (
 )
 
 const (
-	GAMEOVER = iota
-	PLAYING  = iota
+	GAMEOVER     = iota
+	DISCONNECTED = iota
+	PLAYING      = iota
 )
 
 const (
@@ -76,36 +79,63 @@ const (
 	SPACE = 32
 )
 
-func eventHandler(events chan Event) {
+func newGame() *Game {
+	ret := &Game{
+		Events:  make(chan *Event, 0),
+		Players: make(map[int]*PlayerContext),
+	}
+
+	go ret.eventHandler(ret.Events)
+	go ret.timer()
+	return ret
+}
+
+func (g *Game) eventHandler(events chan *Event) {
 	for true {
 		select {
 		case input := <-events:
 			switch input.Type {
 			case KEYUP:
 				fmt.Printf("Player %d key %d up", input.Player, input.Code)
-				World.Players[input.Player].Keys[input.Code] = false
+				g.Players[input.Player].Keys[input.Code] = false
 			case KEYDOWN:
 				fmt.Printf("Player %d key %d down", input.Player, input.Code)
-				World.Players[input.Player].Keys[input.Code] = true
+				g.Players[input.Player].Keys[input.Code] = true
 			case JOIN:
-				newPlayer := PlayerCount
-				PlayerCount++
+				newPlayer := g.nextPlayerId
+				g.nextPlayerId++
+				g.PlayerCount++
 				fmt.Printf("Player %d Joined\n", newPlayer)
-				World.Players[newPlayer] = &PlayerContext{
+				g.Players[newPlayer] = &PlayerContext{
 					Player: &Player{
 						Id:       newPlayer,
-						State:    GAMEOVER,
+						State:    DISCONNECTED,
 						Position: Position{X: 320, Y: 240, Size: 10},
 					},
-					Return:        input.Return,
+					Token:         input.PlayerToken,
 					Keys:          make(map[int]bool, 0),
 					GameOverUntil: time.Now().Unix() + 3,
 				}
 				input.Return <- fmt.Sprintf("%d", newPlayer)
+			case CONNECT:
+				log.Printf("Player connecting to game")
+				var playerContext *PlayerContext
+				for _, p := range g.Players {
+					if p.Token == input.PlayerToken {
+						playerContext = p
+					}
+				}
+				if playerContext == nil {
+					input.Return <- ""
+				}
+				playerContext.Player.State = GAMEOVER
+				playerContext.Return = input.Return
+				input.Return <- fmt.Sprintf("%d", playerContext.Player.Id)
 			case QUIT:
-				delete(World.Players, input.Player)
+				delete(g.Players, input.Player)
+				g.PlayerCount--
 			case TIMER:
-				for _, pc := range World.Players {
+				for _, pc := range g.Players {
 					p := pc.Player
 					throttle := 0.0
 					x := p.Position.SpeedX
@@ -153,7 +183,7 @@ func eventHandler(events chan Event) {
 									newBullet.Position.SpeedX = x * 20.0
 									newBullet.Position.SpeedY = y * 20.0
 
-									World.Bullets = append(World.Bullets, newBullet)
+									g.Bullets = append(g.Bullets, newBullet)
 								}
 							}
 						}
@@ -190,12 +220,12 @@ func eventHandler(events chan Event) {
 				newBullets := []*Bullet{}
 				now := time.Now().Unix()
 
-				for _, v := range World.Bullets {
+				for _, v := range g.Bullets {
 					if v.EndTime > now {
 						newBullets = append(newBullets, v)
 					}
 
-					for _, pc := range World.Players {
+					for _, pc := range g.Players {
 						if distance(*v.Position, pc.Player.Position) < 2.0 && pc.Player.InvincibleFrames == 0 {
 							pc.Player.State = GAMEOVER
 							pc.GameOverUntil = time.Now().Unix() + 3
@@ -205,15 +235,15 @@ func eventHandler(events chan Event) {
 					v.Position.Adjust()
 				}
 
-				World.Bullets = newBullets
+				g.Bullets = newBullets
 
-				data := SerializedEnvironment{
-					Bullets: World.Bullets,
+				data := SerializedGame{
+					Bullets: g.Bullets,
 				}
-				for _, v := range World.Players {
+				for _, v := range g.Players {
 					data.Players = append(data.Players, v.Player)
 				}
-				for id, v := range World.Players {
+				for id, v := range g.Players {
 					data.PlayerId = id
 					state, err := json.Marshal(data)
 					if err != nil {
@@ -225,6 +255,13 @@ func eventHandler(events chan Event) {
 				}
 			}
 		}
+	}
+}
+
+func (g *Game) timer() {
+	for true {
+		time.Sleep(50 * time.Millisecond)
+		g.Events <- &Event{Type: TIMER}
 	}
 }
 
