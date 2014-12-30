@@ -121,10 +121,8 @@ func (g *Game) eventHandler(events chan *Event) {
 		case input := <-events:
 			switch input.Type {
 			case KEYUP:
-				fmt.Printf("Player %d key %d up", input.Player, input.Code)
 				g.Players[input.Player].Keys[input.Code] = false
 			case KEYDOWN:
-				fmt.Printf("Player %d key %d down", input.Player, input.Code)
 				g.Players[input.Player].Keys[input.Code] = true
 			case JOIN:
 				g.handleJoin(input)
@@ -158,7 +156,6 @@ func (g *Game) eventHandler(events chan *Event) {
 
 					for key, down := range pc.Keys {
 						if down == true {
-							fmt.Printf("key %d is down!\n", key)
 							switch key {
 							case UP:
 								if p.State == GAMEOVER {
