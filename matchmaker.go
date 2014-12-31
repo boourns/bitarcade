@@ -15,10 +15,9 @@ type MatchMaker struct {
 var Matcher *MatchMaker
 
 const (
-	FIND_GAME  = iota
-	GET_GAME   = iota
-	LEAVE_GAME = iota
-	NEW_GAME   = iota
+	FIND_GAME = iota
+	GET_GAME  = iota
+	NEW_GAME  = iota
 )
 
 const (
@@ -88,9 +87,7 @@ func (m *MatchMaker) run() {
 				}
 			case NEW_GAME:
 				ret.Game, ret.GameToken = m.newGame(event.PlayerToken)
-			case LEAVE_GAME:
-				log.Printf("TODO: LEAVE_GAME")
-				//m.leaveGame()
+
 			case GET_GAME:
 				ret.Game = m.Games[event.GameToken]
 			}

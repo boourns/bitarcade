@@ -86,7 +86,7 @@
       return undefined
     }
 
-    function drawDead(timestamp) {
+    function drawDead(player, timestamp) {
       if (data === undefined) {
         $("#title").html("Connecting..");
         return
@@ -98,7 +98,14 @@
         scoresTable += "<tr><td>" + player.Id + "</td><td>" + player.Score + "</td></tr>"
       }
       scoresTable += "</table>"
-      $('#title').html("You're Dead!");
+
+      if (player.Id == player.KilledBy) {
+        $('#title').html("You committed suicide :(");
+      } else if (player.KilledBy >= 0) {
+        $('#title').html("Killed by Player " + player.KilledBy);
+      } else {
+        $('#title').html("Joined Game!");
+      }
       $('#content').html(scoresTable);
       $('#modal').show();
     }
@@ -165,7 +172,7 @@
     function drawScreen(timestamp) {
       data = worldData;
       if (data === undefined) {
-        drawDead(timestamp);
+        drawDead(undefined, timestamp);
         window.requestAnimationFrame(drawScreen);
         return
       }
@@ -176,7 +183,7 @@
         // connecting
       } else {
       if (player.State == 0) {
-          drawDead(timestamp);
+          drawDead(player, timestamp);
           deadLastFrame = true
         } else if (deadLastFrame == true) {
           $('#modal').hide();

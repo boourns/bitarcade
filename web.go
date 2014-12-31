@@ -22,8 +22,9 @@ type Event struct {
 }
 
 type InputEvent struct {
-	Code int
-	Down bool
+	Code       int
+	Down       bool
+	Disconnect bool
 }
 
 // boring consts for websocket
@@ -99,15 +100,6 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	playerId, _ := strconv.ParseInt(response, 10, 32)
 
-	// leave game (maybe that's crazy) if websocket disconnects, TODO: go back to game disconnect
-	defer func(playerToken string) {
-		Matcher.Events <- &MatchMakerEvent{
-			Type:        LEAVE_GAME,
-			PlayerToken: playerToken,
-			GameToken:   gameToken,
-		}
-	}(playerToken)
-
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {
@@ -128,6 +120,8 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				log.Printf("error reading from websocket:%s", err)
 				ws.Close()
+				reader <- InputEvent{Disconnect: true}
+
 				break
 			}
 			var ev InputEvent
@@ -150,6 +144,8 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 			ev := &Event{Player: int(playerId), Code: input.Code}
 			if input.Down {
 				ev.Type = KEYDOWN
+			} else if input.Disconnect {
+				ev.Type = DISCONNECT
 			} else {
 				ev.Type = KEYUP
 			}

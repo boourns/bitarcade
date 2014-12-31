@@ -14,8 +14,10 @@ const (
 )
 
 const (
-	MAXSPEED   = 10.0
-	MAXBULLETS = 10
+	MAXSPEED              = 10.0
+	MAXBULLETS            = 10
+	FRAMES_TILL_NEXT_SHOT = 5
+	BULLET_SPEED          = 17.0
 )
 
 type Position struct {
@@ -37,12 +39,13 @@ type Player struct {
 }
 
 type PlayerContext struct {
-	Player          *Player
-	Keys            map[int]bool
-	Return          chan string
-	GameOverUntil   int64
-	Token           string
-	LiveBulletCount int
+	Player             *Player
+	Keys               map[int]bool
+	Return             chan string
+	GameOverUntil      int64
+	Token              string
+	LiveBulletCount    int
+	FramesTillNextShot int
 }
 
 type Bullet struct {
@@ -68,12 +71,13 @@ type SerializedGame struct {
 }
 
 const (
-	JOIN    = iota
-	CONNECT = iota
-	KEYDOWN = iota
-	KEYUP   = iota
-	QUIT    = iota
-	TIMER   = iota
+	JOIN       = iota
+	CONNECT    = iota
+	KEYDOWN    = iota
+	KEYUP      = iota
+	QUIT       = iota
+	TIMER      = iota
+	DISCONNECT = iota
 )
 
 const (
@@ -118,6 +122,7 @@ func (g *Game) handleJoin(input *Event) {
 			Id:       newPlayer,
 			State:    DISCONNECTED,
 			Position: Position{X: 320, Y: 240, Size: 10},
+			KilledBy: -1,
 		},
 		Token:         input.PlayerToken,
 		Keys:          make(map[int]bool, 0),
@@ -165,6 +170,10 @@ func (g *Game) eventHandler(events chan *Event) {
 
 					curSpeed := math.Sqrt(x*x + y*y)
 
+					if pc.FramesTillNextShot > 0 {
+						pc.FramesTillNextShot--
+					}
+
 					for key, down := range pc.Keys {
 						if down == true {
 							switch key {
@@ -189,10 +198,11 @@ func (g *Game) eventHandler(events chan *Event) {
 									if time.Now().Unix() > pc.GameOverUntil {
 										fmt.Printf("Playing now!\n")
 										p.State = PLAYING
-										p.InvincibleFrames = 180
+										p.InvincibleFrames = 75
 									}
 								} else {
-									if pc.LiveBulletCount < MAXBULLETS {
+									if pc.LiveBulletCount < MAXBULLETS && pc.FramesTillNextShot == 0 {
+										pc.FramesTillNextShot = FRAMES_TILL_NEXT_SHOT
 										pc.LiveBulletCount++
 										newBullet := &Bullet{
 											Position: &Position{
@@ -204,8 +214,10 @@ func (g *Game) eventHandler(events chan *Event) {
 											OwnerPlayerId: p.Id,
 										}
 										x, y = math.Sincos(newBullet.Position.Direction)
-										newBullet.Position.SpeedX = x * 15.0
-										newBullet.Position.SpeedY = y * 15.0
+										newBullet.Position.SpeedX = x * BULLET_SPEED
+										newBullet.Position.SpeedY = y * BULLET_SPEED
+										newBullet.Position.X += int(x * 30.0)
+										newBullet.Position.Y += int(y * 30.0)
 
 										g.Bullets = append(g.Bullets, newBullet)
 									}
@@ -253,7 +265,7 @@ func (g *Game) eventHandler(events chan *Event) {
 					}
 
 					for _, pc := range g.Players {
-						if distance(*v.Position, pc.Player.Position) < 2.0 && pc.Player.InvincibleFrames == 0 && pc.Player.State == PLAYING {
+						if distance(*v.Position, pc.Player.Position) < 10.0 && pc.Player.InvincibleFrames == 0 && pc.Player.State == PLAYING {
 							pc.Player.State = GAMEOVER
 							pc.Player.KilledBy = v.OwnerPlayerId
 							if v.OwnerPlayerId != pc.Player.Id {
