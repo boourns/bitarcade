@@ -16,8 +16,8 @@ var Matcher *MatchMaker
 
 const (
 	FIND_GAME = iota
-	GET_GAME  = iota
 	NEW_GAME  = iota
+	JOIN_GAME = iota
 )
 
 const (
@@ -42,20 +42,28 @@ func NewMatchMaker() *MatchMaker {
 	return ret
 }
 
-func (m *MatchMaker) joinGame(game *Game, playerToken string) int {
+func (m *MatchMaker) joinGame(gameToken string, playerToken string) *Game {
 	receiver := make(chan string, 0)
+	game, ok := m.Games[gameToken]
+	if !ok {
+		return nil
+	}
+
 	game.Events <- &Event{Type: JOIN, Return: receiver, PlayerToken: playerToken}
 	response := <-receiver
 
 	playerId, _ := strconv.ParseInt(response, 10, 32)
-	return int(playerId)
+	if playerId >= 0 {
+		return game
+	} else {
+		return nil
+	}
 }
 
 func (m *MatchMaker) newGame(playerToken string) (*Game, string) {
 	game := newGame()
 	token := Token()
 	m.Games[token] = game
-	m.joinGame(game, playerToken)
 	return game, token
 }
 
@@ -70,14 +78,12 @@ func (m *MatchMaker) run() {
 			case FIND_GAME:
 				for t, g := range m.Games {
 					if g.PlayerCount < MIN_PLAYERS {
-						m.joinGame(g, event.PlayerToken)
 						ret.Game = g
 						ret.GameToken = t
 					}
 				}
 				for t, g := range m.Games {
 					if g.PlayerCount < MAX_PLAYERS {
-						m.joinGame(g, event.PlayerToken)
 						ret.Game = g
 						ret.GameToken = t
 					}
@@ -88,8 +94,9 @@ func (m *MatchMaker) run() {
 			case NEW_GAME:
 				ret.Game, ret.GameToken = m.newGame(event.PlayerToken)
 
-			case GET_GAME:
-				ret.Game = m.Games[event.GameToken]
+			case JOIN_GAME:
+				ret.Game = m.joinGame(event.GameToken, event.PlayerToken)
+
 			}
 			event.Return <- &ret
 		}

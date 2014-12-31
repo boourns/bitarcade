@@ -14,10 +14,11 @@ const (
 )
 
 const (
-	MAXSPEED              = 10.0
-	MAXBULLETS            = 10
-	FRAMES_TILL_NEXT_SHOT = 5
-	BULLET_SPEED          = 17.0
+	MAXSPEED                 = 10.0
+	MAXBULLETS               = 10
+	FRAMES_TILL_NEXT_SHOT    = 5
+	BULLET_SPEED             = 17.0
+	MAX_DISCONNECTED_SECONDS = 5
 )
 
 type Position struct {
@@ -46,6 +47,7 @@ type PlayerContext struct {
 	Token              string
 	LiveBulletCount    int
 	FramesTillNextShot int
+	DisconnectedTime   int64
 }
 
 type Bullet struct {
@@ -158,11 +160,12 @@ func (g *Game) eventHandler(events chan *Event) {
 					playerContext.Return = input.Return
 					input.Return <- fmt.Sprintf("%d", playerContext.Player.Id)
 				}
-			case QUIT:
-				delete(g.Players, input.Player)
-				g.PlayerCount--
+			case DISCONNECT:
+				g.Players[input.Player].Player.State = DISCONNECTED
+				g.Players[input.Player].DisconnectedTime = time.Now().Unix()
+
 			case TIMER:
-				for _, pc := range g.Players {
+				for token, pc := range g.Players {
 					p := pc.Player
 					throttle := 0.0
 					x := p.Position.SpeedX
@@ -172,6 +175,12 @@ func (g *Game) eventHandler(events chan *Event) {
 
 					if pc.FramesTillNextShot > 0 {
 						pc.FramesTillNextShot--
+					}
+					if pc.Player.State == DISCONNECTED && time.Now().Unix() > pc.DisconnectedTime+MAX_DISCONNECTED_SECONDS {
+						log.Printf("Deleting player %s, disconnected", pc.Token)
+						delete(g.Players, token)
+						g.PlayerCount--
+						continue
 					}
 
 					for key, down := range pc.Keys {

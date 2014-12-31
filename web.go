@@ -75,7 +75,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	// auth to matchmaker, and get game pointer
 	returnChan := make(chan *MatchMakerEvent, 0)
 	Matcher.Events <- &MatchMakerEvent{
-		Type:        GET_GAME,
+		Type:        JOIN_GAME,
 		PlayerToken: playerToken,
 		GameToken:   gameToken,
 		Return:      returnChan,
