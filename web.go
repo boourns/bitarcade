@@ -158,7 +158,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var homeTempl = template.Must(template.ParseFiles("home.html"))
+var gameTempl = template.Must(template.ParseFiles("static/game.html"))
 
 func serveGame(w http.ResponseWriter, r *http.Request) {
 	if path.Dir(r.URL.Path) != "/game" {
@@ -171,7 +171,7 @@ func serveGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	playerToken, err := getPlayerToken(w, r, false)
+	playerToken, err := getPlayerToken(w, r, true)
 	log.Printf("Player Token = %s", playerToken)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%v", err), 500)
@@ -189,7 +189,7 @@ func serveGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	homeTempl.Execute(w, r.Host)
+	gameTempl.Execute(w, r.Host)
 }
 
 func getPlayerToken(w http.ResponseWriter, r *http.Request, saveSession bool) (token string, err error) {
@@ -217,4 +217,47 @@ func getPlayerToken(w http.ResponseWriter, r *http.Request, saveSession bool) (t
 	}
 
 	return
+}
+
+var indexTempl = template.Must(template.ParseFiles("static/index.html"))
+
+func serveIndex(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.Error(w, "Not found", 404)
+		return
+	}
+
+	if r.Method != "GET" {
+		http.Error(w, "Method nod allowed", 405)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	indexTempl.Execute(w, r.Host)
+}
+
+func serveSummary(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/summary.json" {
+		http.Error(w, "Not found", 404)
+		return
+	}
+
+	if r.Method != "GET" {
+		http.Error(w, "Method nod allowed", 405)
+		return
+	}
+
+	response := make(chan *MatchMakerEvent, 0)
+
+	request := &MatchMakerEvent{
+		Type:   GET_SUMMARY,
+		Return: response,
+	}
+
+	Matcher.Events <- request
+	event := <-response
+
+	fmt.Fprintf(w, "%s", string(event.Summary))
+
+	w.Header().Set("Content-Type", "application/json")
 }

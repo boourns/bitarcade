@@ -11,9 +11,11 @@ var store = sessions.NewCookieStore([]byte("bcbce3d0e4aca94b769a4ae424ed0915"), 
 func main() {
 	Matcher = NewMatchMaker()
 
-	http.HandleFunc("/game/", serveGame)
 	http.HandleFunc("/", serveMatchMaker)
+	http.HandleFunc("/game/", serveGame)
+	http.HandleFunc("/summary.json", serveSummary)
 	http.HandleFunc("/ws", websocketHandler)
+
 	http.HandleFunc("/jquery.min.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/jquery.min.js")
 	})

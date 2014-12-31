@@ -19,6 +19,7 @@ const (
 	FRAMES_TILL_NEXT_SHOT    = 5
 	BULLET_SPEED             = 17.0
 	MAX_DISCONNECTED_SECONDS = 5
+	DEATH_SECONDS            = 1
 )
 
 type Position struct {
@@ -59,10 +60,10 @@ type Bullet struct {
 type Game struct {
 	Playing      bool
 	EndScore     int
-	Players      map[int]*PlayerContext
-	Bullets      []*Bullet
+	Players      map[int]*PlayerContext `json:"-"`
+	Bullets      []*Bullet              `json:"-"`
 	PlayerCount  int
-	Events       chan *Event
+	Events       chan *Event `json:"-"`
 	nextPlayerId int
 }
 
@@ -283,7 +284,7 @@ func (g *Game) eventHandler(events chan *Event) {
 								// suicide
 								pc.Player.Score--
 							}
-							pc.GameOverUntil = time.Now().Unix() + 3
+							pc.GameOverUntil = time.Now().Unix() + DEATH_SECONDS
 						}
 					}
 

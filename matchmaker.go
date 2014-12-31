@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,16 +10,17 @@ import (
 
 type MatchMaker struct {
 	Games  map[string]*Game
-	Events chan *MatchMakerEvent
+	Events chan *MatchMakerEvent `json:"-"`
 }
 
 var Matcher *MatchMaker
 
 const (
-	FIND_GAME = iota
-	NEW_GAME  = iota
-	JOIN_GAME = iota
-	GET_GAME  = iota
+	FIND_GAME   = iota
+	NEW_GAME    = iota
+	JOIN_GAME   = iota
+	GET_GAME    = iota
+	GET_SUMMARY = iota
 )
 
 const (
@@ -31,6 +33,7 @@ type MatchMakerEvent struct {
 	PlayerToken string
 	GameToken   string
 	Game        *Game
+	Summary     []byte
 	Return      chan *MatchMakerEvent
 }
 
@@ -101,6 +104,12 @@ func (m *MatchMaker) run() {
 			case GET_GAME:
 				ret.Game = m.Games[event.GameToken]
 
+			case GET_SUMMARY:
+				summary, err := json.Marshal(m)
+				if err != nil {
+					panic(err)
+				}
+				ret.Summary = summary
 			}
 			event.Return <- &ret
 		}
