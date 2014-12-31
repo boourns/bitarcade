@@ -124,6 +124,7 @@ func (g *Game) handleJoin(input *Event) {
 		Player: &Player{
 			Id:       newPlayer,
 			State:    DISCONNECTED,
+			DisconnectedTime: time.Now().Unix()
 			Position: Position{X: 320, Y: 240, Size: 10},
 			KilledBy: -1,
 		},
