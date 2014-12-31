@@ -124,13 +124,13 @@ func (g *Game) handleJoin(input *Event) {
 		Player: &Player{
 			Id:       newPlayer,
 			State:    DISCONNECTED,
-			DisconnectedTime: time.Now().Unix()
 			Position: Position{X: 320, Y: 240, Size: 10},
 			KilledBy: -1,
 		},
-		Token:         input.PlayerToken,
-		Keys:          make(map[int]bool, 0),
-		GameOverUntil: time.Now().Unix(),
+		DisconnectedTime: time.Now().Unix(),
+		Token:            input.PlayerToken,
+		Keys:             make(map[int]bool, 0),
+		GameOverUntil:    time.Now().Unix(),
 	}
 	input.Return <- fmt.Sprintf("%d", newPlayer)
 }
