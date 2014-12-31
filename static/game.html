@@ -46,6 +46,7 @@
   var gameToken;
   var deadLastFrame = true;
   var stars;
+  var connectionLost = false;
 
   function sendKey(code, down) {
     if ((code >= 37 && code <= 40) || code == 32) {
@@ -86,6 +87,14 @@
         }
       }
       return undefined
+    }
+
+    function drawConnectionLost() {
+        $('#title').html("Connection Lost");
+        $('#content').html('Looks like the server went away.<br>  Likely I restarted the server, sorry.  <a href="http://v.burnsmod.com:8080">Join a new game</a>');
+        $('#help').hide();
+        $('#modal').show();
+        connectionLost = true;
     }
 
     function drawDead(player, timestamp) {
@@ -173,6 +182,9 @@
     }
 
     function drawScreen(timestamp) {
+      if (connectionLost == true) {
+        return
+      }
       data = worldData;
       if (data === undefined) {
         drawDead(undefined, timestamp);
@@ -201,14 +213,14 @@
     if (window["WebSocket"]) {
       conn = new WebSocket("ws://{{$}}/ws?game=" + gameToken);
       conn.onclose = function(evt) {
-        debugger
+        drawConnectionLost();
         console.log("<div><b>Connection closed.</b></div>")
       }
       conn.onmessage = function(evt) {
         worldData = JSON.parse(evt.data);
       }
       conn.onerror = function(evt) {
-        debugger
+        drawConnectionLost();
       }
       window.setInterval(function() {
         conn.send("PONG")
