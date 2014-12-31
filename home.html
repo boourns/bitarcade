@@ -117,7 +117,7 @@
       ctx.drawImage(stars, 0, 0, 640, 480, 0, 0, 640, 480);
 
       for (i = 0; i < data.Players.length; ++i) {
-        if (data.Players[i].State == 0) {
+        if (data.Players[i].State != 2) {
            continue
         }
 

@@ -81,9 +81,9 @@ const (
 )
 
 const (
-	GAMEOVER     = iota
-	DISCONNECTED = iota
-	PLAYING      = iota
+	GAMEOVER     = 0
+	DISCONNECTED = 1
+	PLAYING      = 2
 )
 
 const (
