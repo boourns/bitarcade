@@ -14,7 +14,8 @@ const (
 )
 
 const (
-	MAXSPEED = 10.0
+	MAXSPEED   = 10.0
+	MAXBULLETS = 10
 )
 
 type Position struct {
@@ -36,11 +37,12 @@ type Player struct {
 }
 
 type PlayerContext struct {
-	Player        *Player
-	Keys          map[int]bool
-	Return        chan string
-	GameOverUntil int64
-	Token         string
+	Player          *Player
+	Keys            map[int]bool
+	Return          chan string
+	GameOverUntil   int64
+	Token           string
+	LiveBulletCount int
 }
 
 type Bullet struct {
@@ -190,20 +192,23 @@ func (g *Game) eventHandler(events chan *Event) {
 										p.InvincibleFrames = 180
 									}
 								} else {
-									newBullet := &Bullet{
-										Position: &Position{
-											Direction: p.Position.Direction,
-											X:         p.Position.X,
-											Y:         p.Position.Y,
-										},
-										FramesTillEnd: 60,
-										OwnerPlayerId: p.Id,
-									}
-									x, y = math.Sincos(newBullet.Position.Direction)
-									newBullet.Position.SpeedX = x * 15.0
-									newBullet.Position.SpeedY = y * 15.0
+									if pc.LiveBulletCount < MAXBULLETS {
+										pc.LiveBulletCount++
+										newBullet := &Bullet{
+											Position: &Position{
+												Direction: p.Position.Direction,
+												X:         p.Position.X,
+												Y:         p.Position.Y,
+											},
+											FramesTillEnd: 60,
+											OwnerPlayerId: p.Id,
+										}
+										x, y = math.Sincos(newBullet.Position.Direction)
+										newBullet.Position.SpeedX = x * 15.0
+										newBullet.Position.SpeedY = y * 15.0
 
-									g.Bullets = append(g.Bullets, newBullet)
+										g.Bullets = append(g.Bullets, newBullet)
+									}
 								}
 							}
 						}
@@ -243,6 +248,8 @@ func (g *Game) eventHandler(events chan *Event) {
 					v.FramesTillEnd--
 					if v.FramesTillEnd > 0 {
 						newBullets = append(newBullets, v)
+					} else {
+						g.Players[v.OwnerPlayerId].LiveBulletCount--
 					}
 
 					for _, pc := range g.Players {

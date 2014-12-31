@@ -125,7 +125,11 @@
         point3y = ship.Y - 15 * (Math.cos(ship.Direction - 0.35));
 
         ctx.lineWidth = 2;
-        ctx.strokeStyle = '#00AA00';
+        if (player.Id == data.Players[i].Id) {
+          ctx.strokeStyle = '#00AA00';
+        } else {
+          ctx.strokeStyle = '#DDDDDD';
+        }
 
         if (data.Players[i].InvincibleFrames > 0) {
           if (timestamp % 120 < 60) {
