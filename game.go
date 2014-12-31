@@ -13,6 +13,10 @@ const (
 	SCREEN_HEIGHT = 480
 )
 
+const (
+	MAXSPEED = 10.0
+)
+
 type Position struct {
 	X         int
 	Y         int
@@ -41,7 +45,7 @@ type PlayerContext struct {
 
 type Bullet struct {
 	Position      *Position
-	EndTime       int64
+	FramesTillEnd int64
 	OwnerPlayerId int
 }
 
@@ -192,12 +196,12 @@ func (g *Game) eventHandler(events chan *Event) {
 											X:         p.Position.X,
 											Y:         p.Position.Y,
 										},
-										EndTime:       time.Now().Unix() + 10,
+										FramesTillEnd: 60,
 										OwnerPlayerId: p.Id,
 									}
 									x, y = math.Sincos(newBullet.Position.Direction)
-									newBullet.Position.SpeedX = x * 20.0
-									newBullet.Position.SpeedY = y * 20.0
+									newBullet.Position.SpeedX = x * 15.0
+									newBullet.Position.SpeedY = y * 15.0
 
 									g.Bullets = append(g.Bullets, newBullet)
 								}
@@ -213,17 +217,17 @@ func (g *Game) eventHandler(events chan *Event) {
 						p.Position.SpeedY = 0.95 * p.Position.SpeedY
 					}
 
-					if p.Position.SpeedX > 10.0 {
-						p.Position.SpeedX = 10.0
+					if p.Position.SpeedX > MAXSPEED {
+						p.Position.SpeedX = MAXSPEED
 					}
-					if p.Position.SpeedX < -10.0 {
-						p.Position.SpeedX = -10.0
+					if p.Position.SpeedX < -MAXSPEED {
+						p.Position.SpeedX = -MAXSPEED
 					}
-					if p.Position.SpeedY > 10.0 {
-						p.Position.SpeedY = 10.0
+					if p.Position.SpeedY > MAXSPEED {
+						p.Position.SpeedY = MAXSPEED
 					}
-					if p.Position.SpeedY < -10.0 {
-						p.Position.SpeedY = -10.0
+					if p.Position.SpeedY < -MAXSPEED {
+						p.Position.SpeedY = -MAXSPEED
 					}
 
 					p.Position.Adjust()
@@ -234,10 +238,10 @@ func (g *Game) eventHandler(events chan *Event) {
 				}
 
 				newBullets := []*Bullet{}
-				now := time.Now().Unix()
 
 				for _, v := range g.Bullets {
-					if v.EndTime > now {
+					v.FramesTillEnd--
+					if v.FramesTillEnd > 0 {
 						newBullets = append(newBullets, v)
 					}
 
@@ -283,7 +287,7 @@ func (g *Game) eventHandler(events chan *Event) {
 
 func (g *Game) timer() {
 	for true {
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(33 * time.Millisecond)
 		g.Events <- &Event{Type: TIMER}
 	}
 }
