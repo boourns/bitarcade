@@ -93,7 +93,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// connect to game
-	receiver := make(chan string, 0)
+	receiver := make(chan string, 1)
 	game.Events <- &Event{Type: CONNECT, PlayerToken: playerToken, Return: receiver}
 	response := <-receiver
 	if response == "" {

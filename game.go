@@ -111,7 +111,10 @@ func newGame() *Game {
 func (g *Game) handleJoin(input *Event) {
 	for id, player := range g.Players {
 		if player.Token == input.PlayerToken {
-			input.Return <- fmt.Sprintf("%d", id)
+			select {
+			case input.Return <- fmt.Sprintf("%d", id):
+			default:
+			}
 			return
 		}
 	}
@@ -132,7 +135,10 @@ func (g *Game) handleJoin(input *Event) {
 		Keys:             make(map[int]bool, 0),
 		GameOverUntil:    time.Now().Unix(),
 	}
-	input.Return <- fmt.Sprintf("%d", newPlayer)
+	select {
+	case input.Return <- fmt.Sprintf("%d", newPlayer):
+	default:
+	}
 }
 
 func (g *Game) eventHandler(events chan *Event) {
@@ -156,11 +162,17 @@ func (g *Game) eventHandler(events chan *Event) {
 					}
 				}
 				if playerContext == nil {
-					input.Return <- ""
+					select {
+					case input.Return <- "":
+					default:
+					}
 				} else {
 					playerContext.Player.State = GAMEOVER
 					playerContext.Return = input.Return
-					input.Return <- fmt.Sprintf("%d", playerContext.Player.Id)
+					select {
+					case input.Return <- fmt.Sprintf("%d", playerContext.Player.Id):
+					default:
+					}
 				}
 			case DISCONNECT:
 				g.Players[input.Player].Player.State = DISCONNECTED
@@ -309,7 +321,10 @@ func (g *Game) eventHandler(events chan *Event) {
 					if err != nil {
 						fmt.Printf("Error marshalling world: %v", err)
 					}
-					pc.Return <- string(state)
+					select {
+					case pc.Return <- string(state):
+					default:
+					}
 				}
 			}
 		}
