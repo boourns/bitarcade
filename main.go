@@ -17,6 +17,9 @@ func main() {
 	http.HandleFunc("/jquery.min.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/jquery.min.js")
 	})
+	http.HandleFunc("/background.png", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/background.png")
+	})
 
 	http.ListenAndServe("0.0.0.0:8080", nil)
 }

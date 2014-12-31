@@ -27,6 +27,8 @@ type Player struct {
 	Position         Position
 	State            int
 	InvincibleFrames uint
+	Score            int
+	KilledBy         int
 }
 
 type PlayerContext struct {
@@ -38,11 +40,14 @@ type PlayerContext struct {
 }
 
 type Bullet struct {
-	Position *Position
-	EndTime  int64
+	Position      *Position
+	EndTime       int64
+	OwnerPlayerId int
 }
 
 type Game struct {
+	Playing      bool
+	EndScore     int
 	Players      map[int]*PlayerContext
 	Bullets      []*Bullet
 	PlayerCount  int
@@ -187,7 +192,8 @@ func (g *Game) eventHandler(events chan *Event) {
 											X:         p.Position.X,
 											Y:         p.Position.Y,
 										},
-										EndTime: time.Now().Unix() + 10,
+										EndTime:       time.Now().Unix() + 10,
+										OwnerPlayerId: p.Id,
 									}
 									x, y = math.Sincos(newBullet.Position.Direction)
 									newBullet.Position.SpeedX = x * 20.0
@@ -236,8 +242,15 @@ func (g *Game) eventHandler(events chan *Event) {
 					}
 
 					for _, pc := range g.Players {
-						if distance(*v.Position, pc.Player.Position) < 2.0 && pc.Player.InvincibleFrames == 0 {
+						if distance(*v.Position, pc.Player.Position) < 2.0 && pc.Player.InvincibleFrames == 0 && pc.Player.State == PLAYING {
 							pc.Player.State = GAMEOVER
+							pc.Player.KilledBy = v.OwnerPlayerId
+							if v.OwnerPlayerId != pc.Player.Id {
+								g.Players[v.OwnerPlayerId].Player.Score++
+							} else {
+								// suicide
+								pc.Player.Score--
+							}
 							pc.GameOverUntil = time.Now().Unix() + 3
 						}
 					}
