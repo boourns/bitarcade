@@ -299,15 +299,16 @@ func (g *Game) eventHandler(events chan *Event) {
 				for _, v := range g.Players {
 					data.Players = append(data.Players, v.Player)
 				}
-				for id, v := range g.Players {
+				for id, pc := range g.Players {
+					if pc.Player.State == DISCONNECTED {
+						continue
+					}
 					data.PlayerId = id
 					state, err := json.Marshal(data)
 					if err != nil {
 						fmt.Printf("Error marshalling world: %v", err)
 					}
-					go func(output chan string, state []byte) {
-						output <- string(state)
-					}(v.Return, state)
+					pc.Return <- string(state)
 				}
 			}
 		}

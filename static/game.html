@@ -4,6 +4,8 @@
 </head>
 
 <script src="/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
+
 <style>
   body {
     color: #00AA00;
@@ -93,9 +95,10 @@
       }
 
       scoresTable = "<table><tr><th>Player</th><th>Score</th></tr>";
-      for (i = 0; i < data.Players.length; ++i) {
-        player = data.Players[i];
-        scoresTable += "<tr><td>" + player.Id + "</td><td>" + player.Score + "</td></tr>"
+      sortedPlayers = _.sortBy(data.Players, function(p) { return p.Id });
+      for (i = 0; i < sortedPlayers.length; ++i) {
+        scorePlayer = sortedPlayers[i];
+        scoresTable += "<tr><td>" + scorePlayer.Id + "</td><td>" + scorePlayer.Score + "</td></tr>"
       }
       scoresTable += "</table>"
 
