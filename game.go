@@ -126,7 +126,7 @@ func (g *Game) handleJoin(input *Event) {
 		},
 		Token:         input.PlayerToken,
 		Keys:          make(map[int]bool, 0),
-		GameOverUntil: time.Now().Unix() + 3,
+		GameOverUntil: time.Now().Unix(),
 	}
 	input.Return <- fmt.Sprintf("%d", newPlayer)
 }
