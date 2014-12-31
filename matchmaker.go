@@ -18,6 +18,7 @@ const (
 	FIND_GAME = iota
 	NEW_GAME  = iota
 	JOIN_GAME = iota
+	GET_GAME  = iota
 )
 
 const (
@@ -97,6 +98,9 @@ func (m *MatchMaker) run() {
 			case JOIN_GAME:
 				ret.Game = m.joinGame(event.GameToken, event.PlayerToken)
 
+			case GET_GAME:
+				ret.Game = m.Games[event.GameToken]
+
 			}
 			event.Return <- &ret
 		}
@@ -127,8 +131,6 @@ func serveMatchMaker(w http.ResponseWriter, r *http.Request) {
 
 	Matcher.Events <- request
 	match := <-response
-
-	log.Printf("Returned %#v", match)
 
 	http.Redirect(w, r, fmt.Sprintf("/game/%s", match.GameToken), 302)
 }

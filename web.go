@@ -47,6 +47,19 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+func getGame(eventType int, playerToken string, gameToken string) *Game {
+	// auth to matchmaker, and get game pointer
+	returnChan := make(chan *MatchMakerEvent, 0)
+	Matcher.Events <- &MatchMakerEvent{
+		Type:        eventType,
+		PlayerToken: playerToken,
+		GameToken:   gameToken,
+		Return:      returnChan,
+	}
+
+	return (<-returnChan).Game
+}
+
 func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
@@ -71,17 +84,8 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Game token %s, player token %s", gameToken, playerToken)
+	game := getGame(JOIN_GAME, playerToken, gameToken)
 
-	// auth to matchmaker, and get game pointer
-	returnChan := make(chan *MatchMakerEvent, 0)
-	Matcher.Events <- &MatchMakerEvent{
-		Type:        JOIN_GAME,
-		PlayerToken: playerToken,
-		GameToken:   gameToken,
-		Return:      returnChan,
-	}
-
-	game := (<-returnChan).Game
 	if game == nil {
 		http.Error(w, "Matchmaker: Not allowed", 401)
 		log.Printf("MatchMaker: Not Allowed")
@@ -166,6 +170,24 @@ func serveGame(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method nod allowed", 405)
 		return
 	}
+
+	playerToken, err := getPlayerToken(w, r, false)
+	log.Printf("Player Token = %s", playerToken)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("%v", err), 500)
+		log.Printf("error getting player token")
+		return
+	}
+
+	gameToken := path.Base(r.URL.Path)
+	game := getGame(GET_GAME, playerToken, gameToken)
+
+	// TODO redirect back to index with "that game has ended" message
+	if game == nil {
+		http.Error(w, "Game not found", 404)
+		log.Printf("error getting player token")
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	homeTempl.Execute(w, r.Host)
 }
