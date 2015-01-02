@@ -29,17 +29,28 @@
   }
 
   #player {
+    color: #00AA00;
+    background-color: rgba(0,255,0,0.05);
     position: absolute;
     margin: 10px;
     font-family: 'Share Tech Mono';
+    position:fixed !important;
+    position: absolute; /*ie6 */
+    top: 1em;
+    left: 1em;
   }
 
   #score {
+    color: #00AA00;
+    background-color: rgba(0,255,0,0.05);
     position: absolute;
     margin: 10px;
     font-family: 'Share Tech Mono';
     text-align: right;
-    float: right;
+    position:fixed !important;
+    position: absolute; /*ie6 */
+    top: 1em;
+    right: 1em;
   }
 
   #title {
@@ -105,7 +116,7 @@
 
     function drawConnectionLost() {
         $('#title').html("Connection Lost");
-        $('#content').html('Looks like the server went away.<br>  Likely I restarted the server, sorry.  <a href="http://v.burnsmod.com:8080">Join a new game</a>');
+        $('#content').html('Looks like the server went away.<br>  Likely I restarted the server, sorry.  <a href="/">Join a new game</a>');
         $('#help').hide();
         $('#modal').show();
         connectionLost = true;

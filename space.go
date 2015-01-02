@@ -15,11 +15,12 @@ const (
 
 const (
 	MAXSPEED                 = 10.0
-	MAXBULLETS               = 10
-	FRAMES_TILL_NEXT_SHOT    = 5
-	BULLET_SPEED             = 17.0
+	MAXBULLETS               = 5
+	FRAMES_TILL_NEXT_SHOT    = 2
+	BULLET_SPEED             = 18.0
 	MAX_DISCONNECTED_SECONDS = 5
 	DEATH_SECONDS            = 1
+	BULLET_LIFE_FRAMES       = 30
 )
 
 type Position struct {
@@ -147,9 +148,13 @@ func (g *Game) eventHandler(events chan *Event) {
 		case input := <-events:
 			switch input.Type {
 			case KEYUP:
-				g.Players[input.Player].Keys[input.Code] = false
+				if g.Players[input.Player] != nil {
+					g.Players[input.Player].Keys[input.Code] = false
+				}
 			case KEYDOWN:
-				g.Players[input.Player].Keys[input.Code] = true
+				if g.Players[input.Player] != nil {
+					g.Players[input.Player].Keys[input.Code] = true
+				}
 			case JOIN:
 				g.handleJoin(input)
 			case CONNECT:
@@ -233,14 +238,14 @@ func (g *Game) eventHandler(events chan *Event) {
 												X:         p.Position.X,
 												Y:         p.Position.Y,
 											},
-											FramesTillEnd: 60,
+											FramesTillEnd: BULLET_LIFE_FRAMES,
 											OwnerPlayerId: p.Id,
 										}
 										x, y = math.Sincos(newBullet.Position.Direction)
 										newBullet.Position.SpeedX = x * BULLET_SPEED
 										newBullet.Position.SpeedY = y * BULLET_SPEED
-										newBullet.Position.X += int(x * 30.0)
-										newBullet.Position.Y += int(y * 30.0)
+										newBullet.Position.X += int(x * 5.0)
+										newBullet.Position.Y += int(y * 5.0)
 
 										g.Bullets = append(g.Bullets, newBullet)
 									}
@@ -288,14 +293,11 @@ func (g *Game) eventHandler(events chan *Event) {
 					}
 
 					for _, pc := range g.Players {
-						if distance(*v.Position, pc.Player.Position) < 10.0 && pc.Player.InvincibleFrames == 0 && pc.Player.State == PLAYING {
+						if pc.Player.Id != v.OwnerPlayerId && pc.Player.InvincibleFrames == 0 && pc.Player.State == PLAYING && distance(*v.Position, pc.Player.Position) < 10.0 {
 							pc.Player.State = GAMEOVER
 							pc.Player.KilledBy = v.OwnerPlayerId
 							if v.OwnerPlayerId != pc.Player.Id {
 								g.Players[v.OwnerPlayerId].Player.Score++
-							} else {
-								// suicide
-								pc.Player.Score--
 							}
 							pc.GameOverUntil = time.Now().Unix() + DEATH_SECONDS
 						}
