@@ -181,9 +181,10 @@ func (g *Game) eventHandler(events chan *Event) {
 					}
 				}
 			case DISCONNECT:
-				g.Players[input.Player].Player.State = DISCONNECTED
-				g.Players[input.Player].DisconnectedTime = time.Now().Unix()
-
+				if g.Players[input.Player] != nil {
+					g.Players[input.Player].Player.State = DISCONNECTED
+					g.Players[input.Player].DisconnectedTime = time.Now().Unix()
+				}
 			case TIMER:
 				var gameEvents = []string{}
 
