@@ -125,7 +125,7 @@
       for (i = 0; i < data.Events.length; ++i) {
         events.push(data.Events[i]);
         if (events.length == 6) {
-          events.pop();
+          events.shift();
         }
       }
       html = "";
