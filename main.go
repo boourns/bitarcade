@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gorilla/sessions"
 	"net/http"
+	"os"
 )
 
 // yes I know hard-coded credentials - they don't store anything secure yet, don't worry about it :)
@@ -23,5 +24,9 @@ func main() {
 		http.ServeFile(w, r, "static/background.png")
 	})
 
-	http.ListenAndServe("0.0.0.0:8080", nil)
+	bind := "0.0.0.0:8000"
+	if os.Getenv("BITARCADE_BIND") != "" {
+		bind = os.Getenv("BITARCADE_BIND")
+	}
+	http.ListenAndServe(bind, nil)
 }
