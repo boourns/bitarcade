@@ -1,4 +1,3 @@
 #!/bin/bash
-cd /go/src/github.com/boourns/incredible
-./incredible
+BITARCADE_BIND=0.0.0.0:80 ./bitarcade
 
