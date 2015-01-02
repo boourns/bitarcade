@@ -154,6 +154,9 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 				ev.Type = KEYUP
 			}
 			game.Events <- ev
+			if ev.Type == DISCONNECT {
+				return
+			}
 		}
 	}
 }
