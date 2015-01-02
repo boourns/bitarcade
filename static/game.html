@@ -11,7 +11,7 @@
     color: #00AA00;
     background-color: black;
   }
-  
+
   #modal {
     width: 40%;
     height: 60%;
@@ -28,7 +28,7 @@
     text-align: center;
   }
 
-  #player {
+  #player, #score, #credits, #events {
     color: #00AA00;
     background-color: rgba(0,255,0,0.05);
     position: absolute;
@@ -36,34 +36,26 @@
     font-family: 'Share Tech Mono';
     position:fixed !important;
     position: absolute; /*ie6 */
+  }
+
+  #player {
     top: 1em;
     left: 1em;
   }
 
   #score {
-    color: #00AA00;
-    background-color: rgba(0,255,0,0.05);
-    position: absolute;
-    margin: 10px;
-    font-family: 'Share Tech Mono';
-    text-align: right;
-    position:fixed !important;
-    position: absolute; /*ie6 */
     top: 1em;
     right: 1em;
   }
 
   #credits {
-    color: #00AA00;
-    background-color: rgba(0,255,0,0.05);
-    position: absolute;
-    margin: 10px;
-    font-family: 'Share Tech Mono';
-    text-align: right;
-    position:fixed !important;
-    position: absolute; /*ie6 */
     bottom: 1em;
     right: 1em;
+  }
+
+  #events {
+    bottom: 1em;
+    left: 1em;
   }
 
   a:link, a:visited {
@@ -90,6 +82,7 @@
   var deadLastFrame = true;
   var stars;
   var connectionLost = false;
+  var events = [];
 
   function sendKey(code, down) {
     if ((code >= 37 && code <= 40) || code == 32) {
@@ -122,6 +115,26 @@
         evt.preventDefault();
       }
     });
+
+    function updateEvents(data) {
+      if (data.Events.length == 0) {
+        return
+      }
+      debugger
+
+      for (i = 0; i < data.Events.length; ++i) {
+        events.push(data.Events[i]);
+        if (events.length == 6) {
+          events.pop();
+        }
+      }
+      html = "";
+      for (i = events.length-1; i >= 0; i--) {
+        html += events[i] + "<br>"
+      }
+      $("#events").html(html);
+      data.Events = []
+    }
 
     function findPlayer(data) {
       for (i = 0; i < data.Players.length; ++i) {
@@ -215,7 +228,11 @@
         point2y = bullet.Y + 5 * (Math.cos(bullet.Direction));
 
         ctx.lineWidth = 2;
-        ctx.strokeStyle = '#00FF00';
+        if (player.Id == data.Bullets[i].OwnerPlayerId) {
+          ctx.strokeStyle = '#00FF00';
+        } else {
+          ctx.strokeStyle = '#FFFFFF';
+        }
 
         ctx.moveTo(point1x, point1y);
         ctx.lineTo(point2x, point2y);
@@ -235,7 +252,8 @@
         return
       }
 
-      player = findPlayer(data)
+      updateEvents(data);
+      player = findPlayer(data);
 
       if (player == undefined) {
         // connecting
@@ -295,5 +313,6 @@
   <canvas id="screen" width="640" height="480" style="width:100%; height: 100%; z-index: 1;"></canvas>
   <div id="player"></div>
   <div id="score"></div>
+  <div id="events"></div>
   <div id="credits"><a href="http://github.com/boourns/bitarcade">Github</a>-<a href="http://twitter.com/gravitronic">Twitter</a>-<a href="http://reddit.com/r/bitarcade">Forum</a></div>
 </body>

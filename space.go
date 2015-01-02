@@ -72,6 +72,7 @@ type SerializedGame struct {
 	PlayerId int
 	Players  []*Player
 	Bullets  []*Bullet
+	Events   []string
 }
 
 const (
@@ -184,6 +185,8 @@ func (g *Game) eventHandler(events chan *Event) {
 				g.Players[input.Player].DisconnectedTime = time.Now().Unix()
 
 			case TIMER:
+				var gameEvents = []string{}
+
 				for token, pc := range g.Players {
 					p := pc.Player
 					throttle := 0.0
@@ -199,6 +202,7 @@ func (g *Game) eventHandler(events chan *Event) {
 						log.Printf("Deleting player %s, disconnected", pc.Token)
 						delete(g.Players, token)
 						g.PlayerCount--
+						gameEvents = append(gameEvents, fmt.Sprintf("Player %d disconnected.", pc.Player.Id))
 						continue
 					}
 
@@ -227,6 +231,7 @@ func (g *Game) eventHandler(events chan *Event) {
 										fmt.Printf("Playing now!\n")
 										p.State = PLAYING
 										p.InvincibleFrames = 75
+										gameEvents = append(gameEvents, fmt.Sprintf("Player %d Joined.", p.Id))
 									}
 								} else {
 									if pc.LiveBulletCount < MAXBULLETS && pc.FramesTillNextShot == 0 {
@@ -296,6 +301,8 @@ func (g *Game) eventHandler(events chan *Event) {
 						if pc.Player.Id != v.OwnerPlayerId && pc.Player.InvincibleFrames == 0 && pc.Player.State == PLAYING && distance(*v.Position, pc.Player.Position) < 10.0 {
 							pc.Player.State = GAMEOVER
 							pc.Player.KilledBy = v.OwnerPlayerId
+							gameEvents = append(gameEvents, fmt.Sprintf("Player %d killed Player %d.", v.OwnerPlayerId, pc.Player.Id))
+
 							if v.OwnerPlayerId != pc.Player.Id {
 								g.Players[v.OwnerPlayerId].Player.Score++
 							}
@@ -310,6 +317,7 @@ func (g *Game) eventHandler(events chan *Event) {
 
 				data := SerializedGame{
 					Bullets: g.Bullets,
+					Events:  gameEvents,
 				}
 				for _, v := range g.Players {
 					data.Players = append(data.Players, v.Player)
