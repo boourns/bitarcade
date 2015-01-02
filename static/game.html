@@ -53,6 +53,24 @@
     right: 1em;
   }
 
+  #credits {
+    color: #00AA00;
+    background-color: rgba(0,255,0,0.05);
+    position: absolute;
+    margin: 10px;
+    font-family: 'Share Tech Mono';
+    text-align: right;
+    position:fixed !important;
+    position: absolute; /*ie6 */
+    bottom: 1em;
+    right: 1em;
+  }
+
+  a:link, a:visited {
+    color: #00FF00;
+  }
+
+
   #title {
     margin-top: 5px;
   }
@@ -277,4 +295,5 @@
   <canvas id="screen" width="640" height="480" style="width:100%; height: 100%; z-index: 1;"></canvas>
   <div id="player"></div>
   <div id="score"></div>
+  <div id="credits"><a href="http://github.com/boourns/bitarcade">Github</a>-<a href="http://twitter.com/gravitronic">Twitter</a>-<a href="http://reddit.com/r/bitarcade">Forum</a></div>
 </body>
