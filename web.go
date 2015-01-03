@@ -198,7 +198,8 @@ func serveGame(w http.ResponseWriter, r *http.Request) {
 func getPlayerToken(w http.ResponseWriter, r *http.Request, saveSession bool) (token string, err error) {
 	session, err := store.Get(r, "incredible")
 	if err != nil {
-		panic(err)
+		log.Printf("Could not get session store")
+		return "", err
 	}
 
 	session.Options = &sessions.Options{
@@ -236,7 +237,9 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	indexTempl.Execute(w, r.Host)
+	if err := indexTempl.Execute(w, r.Host); err != nil {
+		panic(err)
+	}
 }
 
 func serveSummary(w http.ResponseWriter, r *http.Request) {
