@@ -10,11 +10,6 @@ import (
 	"strconv"
 )
 
-type MatchMaker struct {
-	Games  map[string]game.Game
-	Events chan *MatchMakerEvent `json:"-"`
-}
-
 var Matcher *MatchMaker
 
 const (
@@ -34,9 +29,14 @@ type MatchMakerEvent struct {
 	Return      chan *MatchMakerEvent
 }
 
+type MatchMaker struct {
+	games  map[string]game.Game
+	Events chan *MatchMakerEvent `json:"-"`
+}
+
 func NewMatchMaker() *MatchMaker {
 	ret := &MatchMaker{
-		Games:  make(map[string]game.Game),
+		games:  make(map[string]game.Game),
 		Events: make(chan *MatchMakerEvent, 0),
 	}
 	go ret.run()
@@ -45,7 +45,7 @@ func NewMatchMaker() *MatchMaker {
 
 func (m *MatchMaker) joinGame(gameToken string, playerToken string) game.Game {
 	receiver := make(chan string, 0)
-	g, ok := m.Games[gameToken]
+	g, ok := m.games[gameToken]
 	if !ok {
 		return nil
 	}
@@ -63,7 +63,7 @@ func (m *MatchMaker) joinGame(gameToken string, playerToken string) game.Game {
 func (m *MatchMaker) newGame() (game.Game, string) {
 	space := space.New()
 	token := Token()
-	m.Games[token] = space
+	m.games[token] = space
 	return space, token
 }
 
@@ -76,7 +76,7 @@ func (m *MatchMaker) run() {
 
 			switch event.Type {
 			case FIND_GAME:
-				for t, g := range m.Games {
+				for t, g := range m.games {
 					if g.AcceptingPlayers() {
 						ret.Game = g
 						ret.GameToken = t
@@ -92,7 +92,7 @@ func (m *MatchMaker) run() {
 				ret.Game = m.joinGame(event.GameToken, event.PlayerToken)
 
 			case GET_GAME:
-				ret.Game = m.Games[event.GameToken]
+				ret.Game = m.games[event.GameToken]
 
 			case GET_SUMMARY:
 				summary, err := json.Marshal(m)

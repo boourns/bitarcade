@@ -58,7 +58,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Player connecting")
+	log.Printf("Player websocket connecting")
 
 	params := r.URL.Query()
 	if len(params["game"]) != 1 {
