@@ -46,7 +46,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func getGame(eventType int, playerToken string, gameToken string) *Game {
+func getGame(eventType int, playerToken string, gameToken string) Game {
 	// auth to matchmaker, and get game pointer
 	returnChan := make(chan *MatchMakerEvent, 0)
 	Matcher.Events <- &MatchMakerEvent{
@@ -93,7 +93,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	// connect to game
 	receiver := make(chan string, 1)
-	game.Events <- &Event{Type: CONNECT, PlayerToken: playerToken, Return: receiver}
+	game.SendEvent(&GameEvent{Type: CONNECT, PlayerToken: playerToken, Return: receiver})
 	response := <-receiver
 	if response == "" {
 		http.Error(w, "Game: Not allowed", 401)
@@ -144,7 +144,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
 			ws.WriteMessage(websocket.TextMessage, []byte(payload))
 		case input := <-reader:
-			ev := &Event{Player: int(playerId), Code: input.Code}
+			ev := &GameEvent{PlayerID: int(playerId), Value: input.Code}
 			if input.Down {
 				ev.Type = KEYDOWN
 			} else if input.Disconnect {
@@ -152,7 +152,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				ev.Type = KEYUP
 			}
-			game.Events <- ev
+			game.SendEvent(ev)
 			if ev.Type == DISCONNECT {
 				return
 			}

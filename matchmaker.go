@@ -9,7 +9,7 @@ import (
 )
 
 type MatchMaker struct {
-	Games  map[string]*Game
+	Games  map[string]Game
 	Events chan *MatchMakerEvent `json:"-"`
 }
 
@@ -32,29 +32,28 @@ type MatchMakerEvent struct {
 	Type        int
 	PlayerToken string
 	GameToken   string
-	Game        *Game
+	Game        Game
 	Summary     []byte
 	Return      chan *MatchMakerEvent
 }
 
 func NewMatchMaker() *MatchMaker {
 	ret := &MatchMaker{
-		Games:  make(map[string]*Game),
+		Games:  make(map[string]Game),
 		Events: make(chan *MatchMakerEvent, 0),
 	}
 	go ret.run()
 	return ret
 }
 
-func (m *MatchMaker) joinGame(gameToken string, playerToken string) *Game {
+func (m *MatchMaker) joinGame(gameToken string, playerToken string) Game {
 	receiver := make(chan string, 0)
 	game, ok := m.Games[gameToken]
 	if !ok {
 		return nil
 	}
 
-	game.Events <- &Event{Type: JOIN, Return: receiver, PlayerToken: playerToken}
-	response := <-receiver
+	response := game.SendEvent(&GameEvent{Type: JOIN, Return: receiver, PlayerToken: playerToken})
 
 	playerId, _ := strconv.ParseInt(response, 10, 32)
 	if playerId >= 0 {
@@ -64,11 +63,11 @@ func (m *MatchMaker) joinGame(gameToken string, playerToken string) *Game {
 	}
 }
 
-func (m *MatchMaker) newGame(playerToken string) (*Game, string) {
-	game := newGame()
+func (m *MatchMaker) newGame() (Game, string) {
+	space := NewSpace()
 	token := Token()
-	m.Games[token] = game
-	return game, token
+	m.Games[token] = space
+	return space, token
 }
 
 func (m *MatchMaker) run() {
@@ -81,22 +80,16 @@ func (m *MatchMaker) run() {
 			switch event.Type {
 			case FIND_GAME:
 				for t, g := range m.Games {
-					if g.PlayerCount < MIN_PLAYERS {
-						ret.Game = g
-						ret.GameToken = t
-					}
-				}
-				for t, g := range m.Games {
-					if g.PlayerCount < MAX_PLAYERS {
+					if g.AcceptingPlayers() {
 						ret.Game = g
 						ret.GameToken = t
 					}
 				}
 				if ret.Game == nil {
-					ret.Game, ret.GameToken = m.newGame(event.PlayerToken)
+					ret.Game, ret.GameToken = m.newGame()
 				}
 			case NEW_GAME:
-				ret.Game, ret.GameToken = m.newGame(event.PlayerToken)
+				ret.Game, ret.GameToken = m.newGame()
 
 			case JOIN_GAME:
 				ret.Game = m.joinGame(event.GameToken, event.PlayerToken)

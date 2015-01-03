@@ -58,14 +58,13 @@ type Bullet struct {
 	OwnerPlayerId int
 }
 
-type Game struct {
-	Playing      bool
-	EndScore     int
+type Space struct {
+	Events       chan *GameEvent
 	Players      map[int]*PlayerContext `json:"-"`
 	Bullets      []*Bullet              `json:"-"`
 	PlayerCount  int
-	Events       chan *Event `json:"-"`
 	nextPlayerId int
+	timerChan    chan bool
 }
 
 type SerializedGame struct {
@@ -74,16 +73,6 @@ type SerializedGame struct {
 	Bullets  []*Bullet
 	Events   []string
 }
-
-const (
-	JOIN       = iota
-	CONNECT    = iota
-	KEYDOWN    = iota
-	KEYUP      = iota
-	QUIT       = iota
-	TIMER      = iota
-	DISCONNECT = iota
-)
 
 const (
 	GAMEOVER     = 0
@@ -99,18 +88,19 @@ const (
 	SPACE = 32
 )
 
-func newGame() *Game {
-	ret := &Game{
-		Events:  make(chan *Event, 0),
-		Players: make(map[int]*PlayerContext),
+func NewSpace() *Space {
+	ret := &Space{
+		Players:   make(map[int]*PlayerContext),
+		timerChan: make(chan bool, 0),
 	}
+	ret.Events = make(chan *GameEvent, 0)
 
-	go ret.eventHandler(ret.Events)
+	go ret.gameLoop()
 	go ret.timer()
 	return ret
 }
 
-func (g *Game) handleJoin(input *Event) {
+func (g *Space) handleJoin(input *GameEvent) {
 	for id, player := range g.Players {
 		if player.Token == input.PlayerToken {
 			select {
@@ -143,19 +133,11 @@ func (g *Game) handleJoin(input *Event) {
 	}
 }
 
-func (g *Game) eventHandler(events chan *Event) {
+func (g *Space) gameLoop() {
 	for true {
 		select {
-		case input := <-events:
+		case input := <-g.Events:
 			switch input.Type {
-			case KEYUP:
-				if g.Players[input.Player] != nil {
-					g.Players[input.Player].Keys[input.Code] = false
-				}
-			case KEYDOWN:
-				if g.Players[input.Player] != nil {
-					g.Players[input.Player].Keys[input.Code] = true
-				}
 			case JOIN:
 				g.handleJoin(input)
 			case CONNECT:
@@ -181,171 +163,179 @@ func (g *Game) eventHandler(events chan *Event) {
 					}
 				}
 			case DISCONNECT:
-				if g.Players[input.Player] != nil {
-					g.Players[input.Player].Player.State = DISCONNECTED
-					g.Players[input.Player].DisconnectedTime = time.Now().Unix()
+				if g.Players[input.PlayerID] != nil {
+					g.Players[input.PlayerID].Player.State = DISCONNECTED
+					g.Players[input.PlayerID].DisconnectedTime = time.Now().Unix()
 				}
-			case TIMER:
-				var gameEvents = []string{}
+			case KEYUP:
+				if g.Players[input.PlayerID] != nil {
+					g.Players[input.PlayerID].Keys[input.Value] = false
+				}
+			case KEYDOWN:
+				if g.Players[input.PlayerID] != nil {
+					g.Players[input.PlayerID].Keys[input.Value] = true
+				}
+			}
+		case <-g.timerChan:
+			var gameEvents = []string{}
 
-				for token, pc := range g.Players {
-					p := pc.Player
-					throttle := 0.0
-					x := p.Position.SpeedX
-					y := p.Position.SpeedY
+			for token, pc := range g.Players {
+				p := pc.Player
+				throttle := 0.0
+				x := p.Position.SpeedX
+				y := p.Position.SpeedY
 
-					curSpeed := math.Sqrt(x*x + y*y)
+				curSpeed := math.Sqrt(x*x + y*y)
 
-					if pc.FramesTillNextShot > 0 {
-						pc.FramesTillNextShot--
-					}
-					if pc.Player.State == DISCONNECTED && time.Now().Unix() > pc.DisconnectedTime+MAX_DISCONNECTED_SECONDS {
-						log.Printf("Deleting player %s, disconnected", pc.Token)
-						delete(g.Players, token)
-						g.PlayerCount--
-						gameEvents = append(gameEvents, fmt.Sprintf("Player %d disconnected.", pc.Player.Id))
-						continue
-					}
+				if pc.FramesTillNextShot > 0 {
+					pc.FramesTillNextShot--
+				}
+				if pc.Player.State == DISCONNECTED && time.Now().Unix() > pc.DisconnectedTime+MAX_DISCONNECTED_SECONDS {
+					log.Printf("Deleting player %s, disconnected", pc.Token)
+					delete(g.Players, token)
+					g.PlayerCount--
+					gameEvents = append(gameEvents, fmt.Sprintf("Player %d disconnected.", pc.Player.Id))
+					continue
+				}
 
-					for key, down := range pc.Keys {
-						if down == true {
-							switch key {
-							case UP:
-								if p.State == GAMEOVER {
-									break
+				for key, down := range pc.Keys {
+					if down == true {
+						switch key {
+						case UP:
+							if p.State == GAMEOVER {
+								break
+							}
+							throttle = 1.0
+						case LEFT:
+							if p.State == GAMEOVER {
+								break
+							}
+							p.Position.Direction += (0.5 * (0.1 + curSpeed/20.0))
+						case RIGHT:
+							if p.State == GAMEOVER {
+								break
+							}
+							p.Position.Direction -= (0.5 * (0.1 + curSpeed/20.0))
+						case SPACE:
+							if p.State == GAMEOVER {
+								fmt.Printf("GameOverUntil %v Now %v\n", pc.GameOverUntil, time.Now().Unix())
+								if time.Now().Unix() > pc.GameOverUntil {
+									fmt.Printf("Playing now!\n")
+									p.State = PLAYING
+									p.InvincibleFrames = 75
+									gameEvents = append(gameEvents, fmt.Sprintf("Player %d Joined.", p.Id))
 								}
-								throttle = 1.0
-							case LEFT:
-								if p.State == GAMEOVER {
-									break
-								}
-								p.Position.Direction += (0.5 * (0.1 + curSpeed/20.0))
-							case RIGHT:
-								if p.State == GAMEOVER {
-									break
-								}
-								p.Position.Direction -= (0.5 * (0.1 + curSpeed/20.0))
-							case SPACE:
-								if p.State == GAMEOVER {
-									fmt.Printf("GameOverUntil %v Now %v\n", pc.GameOverUntil, time.Now().Unix())
-									if time.Now().Unix() > pc.GameOverUntil {
-										fmt.Printf("Playing now!\n")
-										p.State = PLAYING
-										p.InvincibleFrames = 75
-										gameEvents = append(gameEvents, fmt.Sprintf("Player %d Joined.", p.Id))
+							} else {
+								if pc.LiveBulletCount < MAXBULLETS && pc.FramesTillNextShot == 0 {
+									pc.FramesTillNextShot = FRAMES_TILL_NEXT_SHOT
+									pc.LiveBulletCount++
+									newBullet := &Bullet{
+										Position: &Position{
+											Direction: p.Position.Direction,
+											X:         p.Position.X,
+											Y:         p.Position.Y,
+										},
+										FramesTillEnd: BULLET_LIFE_FRAMES,
+										OwnerPlayerId: p.Id,
 									}
-								} else {
-									if pc.LiveBulletCount < MAXBULLETS && pc.FramesTillNextShot == 0 {
-										pc.FramesTillNextShot = FRAMES_TILL_NEXT_SHOT
-										pc.LiveBulletCount++
-										newBullet := &Bullet{
-											Position: &Position{
-												Direction: p.Position.Direction,
-												X:         p.Position.X,
-												Y:         p.Position.Y,
-											},
-											FramesTillEnd: BULLET_LIFE_FRAMES,
-											OwnerPlayerId: p.Id,
-										}
-										x, y = math.Sincos(newBullet.Position.Direction)
-										newBullet.Position.SpeedX = x * BULLET_SPEED
-										newBullet.Position.SpeedY = y * BULLET_SPEED
-										newBullet.Position.X += int(x * 5.0)
-										newBullet.Position.Y += int(y * 5.0)
+									x, y = math.Sincos(newBullet.Position.Direction)
+									newBullet.Position.SpeedX = x * BULLET_SPEED
+									newBullet.Position.SpeedY = y * BULLET_SPEED
+									newBullet.Position.X += int(x * 5.0)
+									newBullet.Position.Y += int(y * 5.0)
 
-										g.Bullets = append(g.Bullets, newBullet)
-									}
+									g.Bullets = append(g.Bullets, newBullet)
 								}
 							}
 						}
 					}
-					x, y = math.Sincos(p.Position.Direction)
-					p.Position.SpeedX += x * throttle
-					p.Position.SpeedY += y * throttle
+				}
+				x, y = math.Sincos(p.Position.Direction)
+				p.Position.SpeedX += x * throttle
+				p.Position.SpeedY += y * throttle
 
-					if p.State == GAMEOVER {
-						p.Position.SpeedX = 0.95 * p.Position.SpeedX
-						p.Position.SpeedY = 0.95 * p.Position.SpeedY
-					}
-
-					if p.Position.SpeedX > MAXSPEED {
-						p.Position.SpeedX = MAXSPEED
-					}
-					if p.Position.SpeedX < -MAXSPEED {
-						p.Position.SpeedX = -MAXSPEED
-					}
-					if p.Position.SpeedY > MAXSPEED {
-						p.Position.SpeedY = MAXSPEED
-					}
-					if p.Position.SpeedY < -MAXSPEED {
-						p.Position.SpeedY = -MAXSPEED
-					}
-
-					p.Position.Adjust()
-
-					if p.InvincibleFrames > 0 {
-						p.InvincibleFrames--
-					}
+				if p.State == GAMEOVER {
+					p.Position.SpeedX = 0.95 * p.Position.SpeedX
+					p.Position.SpeedY = 0.95 * p.Position.SpeedY
 				}
 
-				newBullets := []*Bullet{}
+				if p.Position.SpeedX > MAXSPEED {
+					p.Position.SpeedX = MAXSPEED
+				}
+				if p.Position.SpeedX < -MAXSPEED {
+					p.Position.SpeedX = -MAXSPEED
+				}
+				if p.Position.SpeedY > MAXSPEED {
+					p.Position.SpeedY = MAXSPEED
+				}
+				if p.Position.SpeedY < -MAXSPEED {
+					p.Position.SpeedY = -MAXSPEED
+				}
 
-				for _, v := range g.Bullets {
-					v.FramesTillEnd--
-					if v.FramesTillEnd > 0 {
-						newBullets = append(newBullets, v)
-					} else {
-						g.Players[v.OwnerPlayerId].LiveBulletCount--
-					}
+				p.Position.Adjust()
 
-					for _, pc := range g.Players {
-						if pc.Player.Id != v.OwnerPlayerId && pc.Player.InvincibleFrames == 0 && pc.Player.State == PLAYING && distance(*v.Position, pc.Player.Position) < 10.0 {
-							pc.Player.State = GAMEOVER
-							pc.Player.KilledBy = v.OwnerPlayerId
-							gameEvents = append(gameEvents, fmt.Sprintf("Player %d killed Player %d.", v.OwnerPlayerId, pc.Player.Id))
+				if p.InvincibleFrames > 0 {
+					p.InvincibleFrames--
+				}
+			}
 
-							if v.OwnerPlayerId != pc.Player.Id {
-								g.Players[v.OwnerPlayerId].Player.Score++
-							}
-							pc.GameOverUntil = time.Now().Unix() + DEATH_SECONDS
+			newBullets := []*Bullet{}
+
+			for _, v := range g.Bullets {
+				v.FramesTillEnd--
+				if v.FramesTillEnd > 0 {
+					newBullets = append(newBullets, v)
+				} else {
+					g.Players[v.OwnerPlayerId].LiveBulletCount--
+				}
+
+				for _, pc := range g.Players {
+					if pc.Player.Id != v.OwnerPlayerId && pc.Player.InvincibleFrames == 0 && pc.Player.State == PLAYING && distance(*v.Position, pc.Player.Position) < 10.0 {
+						pc.Player.State = GAMEOVER
+						pc.Player.KilledBy = v.OwnerPlayerId
+						gameEvents = append(gameEvents, fmt.Sprintf("Player %d killed Player %d.", v.OwnerPlayerId, pc.Player.Id))
+
+						if v.OwnerPlayerId != pc.Player.Id {
+							g.Players[v.OwnerPlayerId].Player.Score++
 						}
+						pc.GameOverUntil = time.Now().Unix() + DEATH_SECONDS
 					}
-
-					v.Position.Adjust()
 				}
 
-				g.Bullets = newBullets
+				v.Position.Adjust()
+			}
 
-				data := SerializedGame{
-					Bullets: g.Bullets,
-					Events:  gameEvents,
+			g.Bullets = newBullets
+
+			data := SerializedGame{
+				Bullets: g.Bullets,
+				Events:  gameEvents,
+			}
+			for _, v := range g.Players {
+				data.Players = append(data.Players, v.Player)
+			}
+			for id, pc := range g.Players {
+				if pc.Player.State == DISCONNECTED {
+					continue
 				}
-				for _, v := range g.Players {
-					data.Players = append(data.Players, v.Player)
+				data.PlayerId = id
+				state, err := json.Marshal(data)
+				if err != nil {
+					fmt.Printf("Error marshalling world: %v", err)
 				}
-				for id, pc := range g.Players {
-					if pc.Player.State == DISCONNECTED {
-						continue
-					}
-					data.PlayerId = id
-					state, err := json.Marshal(data)
-					if err != nil {
-						fmt.Printf("Error marshalling world: %v", err)
-					}
-					select {
-					case pc.Return <- string(state):
-					default:
-					}
+				select {
+				case pc.Return <- string(state):
+				default:
 				}
 			}
 		}
 	}
 }
 
-func (g *Game) timer() {
+func (g *Space) timer() {
 	for true {
 		time.Sleep(33 * time.Millisecond)
-		g.Events <- &Event{Type: TIMER}
+		g.timerChan <- false
 	}
 }
 
@@ -370,4 +360,17 @@ func distance(a Position, b Position) float64 {
 	diffX := a.X - b.X
 	diffY := a.Y - b.Y
 	return math.Sqrt(float64((diffX * diffX) + (diffY * diffY)))
+}
+
+func (s *Space) SendEvent(event *GameEvent) string {
+	s.Events <- event
+	return <-event.Return
+}
+
+func (s *Space) AcceptingPlayers() bool {
+	return false
+}
+
+func (s *Space) Summary() interface{} {
+	return nil
 }
