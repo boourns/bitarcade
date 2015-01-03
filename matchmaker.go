@@ -3,13 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/boourns/bitarcade/game"
+	"github.com/boourns/bitarcade/space"
 	"log"
 	"net/http"
 	"strconv"
 )
 
 type MatchMaker struct {
-	Games  map[string]Game
+	Games  map[string]game.Game
 	Events chan *MatchMakerEvent `json:"-"`
 }
 
@@ -27,39 +29,39 @@ type MatchMakerEvent struct {
 	Type        int
 	PlayerToken string
 	GameToken   string
-	Game        Game
+	Game        game.Game
 	Summary     []byte
 	Return      chan *MatchMakerEvent
 }
 
 func NewMatchMaker() *MatchMaker {
 	ret := &MatchMaker{
-		Games:  make(map[string]Game),
+		Games:  make(map[string]game.Game),
 		Events: make(chan *MatchMakerEvent, 0),
 	}
 	go ret.run()
 	return ret
 }
 
-func (m *MatchMaker) joinGame(gameToken string, playerToken string) Game {
+func (m *MatchMaker) joinGame(gameToken string, playerToken string) game.Game {
 	receiver := make(chan string, 0)
-	game, ok := m.Games[gameToken]
+	g, ok := m.Games[gameToken]
 	if !ok {
 		return nil
 	}
 
-	response := game.SendEvent(&GameEvent{Type: JOIN, Return: receiver, PlayerToken: playerToken})
+	response := g.SendEvent(&game.Event{Type: game.JOIN, Return: receiver, PlayerToken: playerToken})
 
 	playerId, _ := strconv.ParseInt(response, 10, 32)
 	if playerId >= 0 {
-		return game
+		return g
 	} else {
 		return nil
 	}
 }
 
-func (m *MatchMaker) newGame() (Game, string) {
-	space := NewSpace()
+func (m *MatchMaker) newGame() (game.Game, string) {
+	space := space.New()
 	token := Token()
 	m.Games[token] = space
 	return space, token

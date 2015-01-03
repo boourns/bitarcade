@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/boourns/bitarcade/game"
 	"github.com/gorilla/websocket"
 	"html/template"
 	"log"
@@ -38,7 +39,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func getGame(eventType int, playerToken string, gameToken string) Game {
+func getGame(eventType int, playerToken string, gameToken string) game.Game {
 	// auth to matchmaker, and get game pointer
 	returnChan := make(chan *MatchMakerEvent, 0)
 	Matcher.Events <- &MatchMakerEvent{
@@ -75,9 +76,9 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Game token %s, player token %s", gameToken, playerToken)
-	game := getGame(JOIN_GAME, playerToken, gameToken)
+	g := getGame(JOIN_GAME, playerToken, gameToken)
 
-	if game == nil {
+	if g == nil {
 		http.Error(w, "Matchmaker: Not allowed", 401)
 		log.Printf("MatchMaker: Not Allowed")
 		return
@@ -85,7 +86,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	// connect to game
 	receiver := make(chan string, 1)
-	response := game.SendEvent(&GameEvent{Type: CONNECT, PlayerToken: playerToken, Return: receiver})
+	response := g.SendEvent(&game.Event{Type: game.CONNECT, PlayerToken: playerToken, Return: receiver})
 	if response == "" {
 		http.Error(w, "Game: Not allowed", 401)
 		log.Printf("Game: Not allowed")
@@ -137,16 +138,16 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
 			ws.WriteMessage(websocket.TextMessage, []byte(payload))
 		case input := <-reader:
-			ev := &GameEvent{PlayerID: int(playerId), Value: input.Code, Return: make(chan string, 1)}
+			ev := &game.Event{PlayerID: int(playerId), Value: input.Code, Return: make(chan string, 1)}
 			if input.Down {
-				ev.Type = KEYDOWN
+				ev.Type = game.KEYDOWN
 			} else if input.Disconnect {
-				ev.Type = DISCONNECT
+				ev.Type = game.DISCONNECT
 			} else {
-				ev.Type = KEYUP
+				ev.Type = game.KEYUP
 			}
-			game.SendEvent(ev)
-			if ev.Type == DISCONNECT {
+			g.SendEvent(ev)
+			if ev.Type == game.DISCONNECT {
 				return
 			}
 		}

@@ -1,8 +1,9 @@
-package main
+package space
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/boourns/bitarcade/game"
 	"log"
 	"math"
 	"time"
@@ -60,7 +61,7 @@ type Bullet struct {
 }
 
 type Space struct {
-	Events       chan *GameEvent
+	Events       chan *game.Event
 	Players      map[int]*PlayerContext `json:"-"`
 	Bullets      []*Bullet              `json:"-"`
 	PlayerCount  int
@@ -89,19 +90,19 @@ const (
 	SPACE = 32
 )
 
-func NewSpace() *Space {
+func New() *Space {
 	ret := &Space{
 		Players:   make(map[int]*PlayerContext),
 		timerChan: make(chan bool, 0),
 	}
-	ret.Events = make(chan *GameEvent, 0)
+	ret.Events = make(chan *game.Event, 0)
 
 	go ret.gameLoop()
 	go ret.timer()
 	return ret
 }
 
-func (g *Space) handleJoin(input *GameEvent) {
+func (g *Space) handleJoin(input *game.Event) {
 	for id, player := range g.Players {
 		if player.Token == input.PlayerToken {
 			select {
@@ -139,10 +140,10 @@ func (g *Space) gameLoop() {
 		select {
 		case input := <-g.Events:
 			switch input.Type {
-			case JOIN:
+			case game.JOIN:
 				// sends return event in handleJoin
 				g.handleJoin(input)
-			case CONNECT:
+			case game.CONNECT:
 				log.Printf("Player connecting to game")
 				var playerContext *PlayerContext
 				for _, p := range g.Players {
@@ -165,18 +166,18 @@ func (g *Space) gameLoop() {
 					default:
 					}
 				}
-			case DISCONNECT:
+			case game.DISCONNECT:
 				if g.Players[input.PlayerID] != nil {
 					g.Players[input.PlayerID].Player.State = DISCONNECTED
 					g.Players[input.PlayerID].DisconnectedTime = time.Now().Unix()
 				}
 				input.Return <- ""
-			case KEYUP:
+			case game.KEYUP:
 				if g.Players[input.PlayerID] != nil {
 					g.Players[input.PlayerID].Keys[input.Value] = false
 				}
 				input.Return <- ""
-			case KEYDOWN:
+			case game.KEYDOWN:
 				if g.Players[input.PlayerID] != nil {
 					g.Players[input.PlayerID].Keys[input.Value] = true
 				}
@@ -368,7 +369,7 @@ func distance(a Position, b Position) float64 {
 	return math.Sqrt(float64((diffX * diffX) + (diffY * diffY)))
 }
 
-func (s *Space) SendEvent(event *GameEvent) string {
+func (s *Space) SendEvent(event *game.Event) string {
 	s.Events <- event
 	return <-event.Return
 }

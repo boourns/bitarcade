@@ -1,4 +1,4 @@
-package main
+package game
 
 const (
 	JOIN       = iota
@@ -8,7 +8,7 @@ const (
 	KEYUP      = iota
 )
 
-type GameEvent struct {
+type Event struct {
 	Type        int
 	Value       int
 	PlayerToken string
@@ -18,7 +18,7 @@ type GameEvent struct {
 }
 
 type Game interface {
-	SendEvent(*GameEvent) string
+	SendEvent(*Event) string
 	AcceptingPlayers() bool
 	Summary() interface{}
 }
