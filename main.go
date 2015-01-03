@@ -1,13 +1,9 @@
 package main
 
 import (
-	"github.com/gorilla/sessions"
 	"net/http"
 	"os"
 )
-
-// yes I know hard-coded credentials - they don't store anything secure yet, don't worry about it :)
-var store = sessions.NewCookieStore([]byte("bcbce3d0e4aca94b769a4ae424ed0915"), []byte("9b1d10720c8416d195d22f6304be5b1a"))
 
 func main() {
 	Matcher = NewMatchMaker()

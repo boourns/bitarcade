@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
 	"html/template"
 	"log"
@@ -196,27 +195,22 @@ func serveGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func getPlayerToken(w http.ResponseWriter, r *http.Request, saveSession bool) (token string, err error) {
-	session, err := store.Get(r, "incredible")
-	if err != nil {
-		log.Printf("Could not get session store")
-		return "", err
-	}
+	var existing *http.Cookie
 
-	session.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7 * 365,
-		HttpOnly: true,
-	}
-
-	var ok bool
-
-	if token, ok = session.Values["token"].(string); !ok {
+	if existing, err = r.Cookie("bitarcade_session"); err == nil {
+		token = existing.Value
+	} else {
 		if saveSession {
 			token = Token()
-			session.Values["token"] = token
-			session.Save(r, w)
+			cookie := &http.Cookie{
+				Name:     "bitarcade_session",
+				Value:    token,
+				Expires:  time.Now().Add(5 * 365 * 24 * time.Hour),
+				HttpOnly: true,
+			}
+			http.SetCookie(w, cookie)
 		} else {
-			err = fmt.Errorf("Session has no token")
+			return "", fmt.Errorf("Request has no session")
 		}
 	}
 
