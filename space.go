@@ -14,6 +14,7 @@ const (
 )
 
 const (
+	MAX_PLAYERS              = 6
 	MAXSPEED                 = 10.0
 	MAXBULLETS               = 5
 	FRAMES_TILL_NEXT_SHOT    = 2
@@ -139,6 +140,7 @@ func (g *Space) gameLoop() {
 		case input := <-g.Events:
 			switch input.Type {
 			case JOIN:
+				// sends return event in handleJoin
 				g.handleJoin(input)
 			case CONNECT:
 				log.Printf("Player connecting to game")
@@ -155,6 +157,7 @@ func (g *Space) gameLoop() {
 					default:
 					}
 				} else {
+					log.Printf("Player %s joined as ID %d", playerContext.Token, playerContext.Player.Id)
 					playerContext.Player.State = GAMEOVER
 					playerContext.Return = input.Return
 					select {
@@ -167,14 +170,17 @@ func (g *Space) gameLoop() {
 					g.Players[input.PlayerID].Player.State = DISCONNECTED
 					g.Players[input.PlayerID].DisconnectedTime = time.Now().Unix()
 				}
+				input.Return <- ""
 			case KEYUP:
 				if g.Players[input.PlayerID] != nil {
 					g.Players[input.PlayerID].Keys[input.Value] = false
 				}
+				input.Return <- ""
 			case KEYDOWN:
 				if g.Players[input.PlayerID] != nil {
 					g.Players[input.PlayerID].Keys[input.Value] = true
 				}
+				input.Return <- ""
 			}
 		case <-g.timerChan:
 			var gameEvents = []string{}
@@ -368,7 +374,7 @@ func (s *Space) SendEvent(event *GameEvent) string {
 }
 
 func (s *Space) AcceptingPlayers() bool {
-	return false
+	return s.PlayerCount < MAX_PLAYERS
 }
 
 func (s *Space) Summary() interface{} {

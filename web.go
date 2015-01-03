@@ -12,14 +12,6 @@ import (
 	"time"
 )
 
-type Event struct {
-	Player      int
-	Type        int
-	Code        int
-	PlayerToken string
-	Return      chan string
-}
-
 type InputEvent struct {
 	Code       int
 	Down       bool
@@ -93,8 +85,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	// connect to game
 	receiver := make(chan string, 1)
-	game.SendEvent(&GameEvent{Type: CONNECT, PlayerToken: playerToken, Return: receiver})
-	response := <-receiver
+	response := game.SendEvent(&GameEvent{Type: CONNECT, PlayerToken: playerToken, Return: receiver})
 	if response == "" {
 		http.Error(w, "Game: Not allowed", 401)
 		log.Printf("Game: Not allowed")
@@ -102,6 +93,8 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	playerId, _ := strconv.ParseInt(response, 10, 32)
+
+	log.Printf("Received player id %d", playerId)
 
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -144,7 +137,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
 			ws.WriteMessage(websocket.TextMessage, []byte(payload))
 		case input := <-reader:
-			ev := &GameEvent{PlayerID: int(playerId), Value: input.Code}
+			ev := &GameEvent{PlayerID: int(playerId), Value: input.Code, Return: make(chan string, 1)}
 			if input.Down {
 				ev.Type = KEYDOWN
 			} else if input.Disconnect {

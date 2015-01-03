@@ -23,11 +23,6 @@ const (
 	GET_SUMMARY = iota
 )
 
-const (
-	MIN_PLAYERS = 2
-	MAX_PLAYERS = 8
-)
-
 type MatchMakerEvent struct {
 	Type        int
 	PlayerToken string
