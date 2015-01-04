@@ -24,5 +24,5 @@ func main() {
 	if os.Getenv("BITARCADE_BIND") != "" {
 		bind = os.Getenv("BITARCADE_BIND")
 	}
-	http.ListenAndServe(bind, nil)
+	http.ListenAndServe(bind, Log(http.DefaultServeMux))
 }
