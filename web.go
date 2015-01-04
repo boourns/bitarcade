@@ -39,10 +39,10 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func getGame(eventType int, playerToken string, gameToken string) game.Game {
+func getGame(eventType int, gameName string, playerToken string, gameToken string) game.Game {
 	// auth to matchmaker, and get game pointer
 	returnChan := make(chan *MatchMakerEvent, 0)
-	Matcher.Events <- &MatchMakerEvent{
+	Matchers[gameName].Events <- &MatchMakerEvent{
 		Type:        eventType,
 		PlayerToken: playerToken,
 		GameToken:   gameToken,
@@ -62,10 +62,20 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	params := r.URL.Query()
 	if len(params["game"]) != 1 {
+		http.Error(w, "error getting game name", 500)
+		log.Printf("error getting game name")
+	}
+	gameName := params["game"][0]
+	if _, ok := Games[gameName]; !ok {
+		http.Error(w, "Game not found", 404)
+		log.Printf("Game not found: %s", gameName)
+	}
+
+	if len(params["token"]) != 1 {
 		http.Error(w, "error getting game token", 500)
 		log.Printf("error getting game token")
 	}
-	gameToken := params["game"][0]
+	gameToken := params["token"][0]
 
 	playerToken, err := getPlayerToken(w, r, false)
 	log.Printf("Player Token = %s", playerToken)
@@ -76,7 +86,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Game token %s, player token %s", gameToken, playerToken)
-	g := getGame(JOIN_GAME, playerToken, gameToken)
+	g := getGame(JOIN_GAME, gameName, playerToken, gameToken)
 
 	if g == nil {
 		http.Error(w, "Matchmaker: Not allowed", 401)
@@ -108,9 +118,8 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	reader := make(chan InputEvent, 0)
 
 	ws.SetReadLimit(maxMessageSize)
-	//	ws.SetReadDeadline(time.Now().Add(pongWait))
-	//	ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 
+	// this is kinda black magic from the gorilla sockets example
 	go func(reader chan InputEvent) {
 		for {
 			_, message, err := ws.ReadMessage()
@@ -154,16 +163,18 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var gameTempl = template.Must(template.ParseFiles("static/game.html"))
+var gameTempl = map[string]*template.Template{"space": template.Must(template.ParseFiles("static/game.html"))}
 
 func serveGame(w http.ResponseWriter, r *http.Request) {
-	if path.Dir(r.URL.Path) != "/game" {
-		http.Error(w, "Not found", 404)
+	gameName := path.Dir(r.URL.Path)[1:]
+
+	if _, ok := Games[gameName]; !ok {
+		http.Error(w, "Game not found", 404)
 		return
 	}
 
 	if r.Method != "GET" {
-		http.Error(w, "Method nod allowed", 405)
+		http.Error(w, "Method not allowed", 405)
 		return
 	}
 
@@ -176,7 +187,7 @@ func serveGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gameToken := path.Base(r.URL.Path)
-	game := getGame(GET_GAME, playerToken, gameToken)
+	game := getGame(GET_GAME, gameName, playerToken, gameToken)
 
 	// TODO redirect back to index with "that game has ended" message
 	if game == nil {
@@ -185,7 +196,7 @@ func serveGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	gameTempl.Execute(w, r.Host)
+	gameTempl[gameName].Execute(w, r.Host)
 }
 
 func getPlayerToken(w http.ResponseWriter, r *http.Request, saveSession bool) (token string, err error) {
@@ -241,6 +252,8 @@ func serveSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	summary := map[string]string{}
+
 	response := make(chan *MatchMakerEvent, 0)
 
 	request := &MatchMakerEvent{
@@ -248,10 +261,12 @@ func serveSummary(w http.ResponseWriter, r *http.Request) {
 		Return: response,
 	}
 
-	Matcher.Events <- request
-	event := <-response
-
-	fmt.Fprintf(w, "%s", string(event.Summary))
+	for name, matcher := range Matchers {
+		matcher.Events <- request
+		event := <-response
+		summary[name] = string(event.Summary)
+	}
+	fmt.Fprintf(w, "%s", summary["space"])
 
 	w.Header().Set("Content-Type", "application/json")
 }

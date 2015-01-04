@@ -90,7 +90,7 @@ const (
 	SPACE = 32
 )
 
-func New() *Space {
+func New() game.Game {
 	ret := &Space{
 		Players:   make(map[int]*PlayerContext),
 		timerChan: make(chan bool, 0),

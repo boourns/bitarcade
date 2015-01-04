@@ -1,15 +1,19 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 )
 
 func main() {
-	Matcher = NewMatchMaker()
+	http.HandleFunc("/", serveIndex)
 
-	http.HandleFunc("/", serveMatchMaker)
-	http.HandleFunc("/game/", serveGame)
+	for name, _ := range Games {
+		http.HandleFunc(fmt.Sprintf("/%s", name), serveMatchMaker)
+		http.HandleFunc(fmt.Sprintf("/%s/", name), serveGame)
+	}
+
 	http.HandleFunc("/summary.json", serveSummary)
 	http.HandleFunc("/ws", websocketHandler)
 

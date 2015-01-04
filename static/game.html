@@ -274,7 +274,7 @@
     }
 
     if (window["WebSocket"]) {
-      conn = new WebSocket("ws://{{$}}/ws?game=" + gameToken);
+      conn = new WebSocket("ws://{{$}}/ws?game=space&token=" + gameToken);
       conn.onclose = function(evt) {
         drawConnectionLost();
         console.log("<div><b>Connection closed.</b></div>")

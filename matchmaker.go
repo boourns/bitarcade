@@ -4,13 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/boourns/bitarcade/game"
+	"github.com/boourns/bitarcade/snake"
 	"github.com/boourns/bitarcade/space"
 	"log"
 	"net/http"
 	"strconv"
 )
 
-var Matcher *MatchMaker
+var Games = map[string]func() game.Game{
+	"space": space.New,
+	"snake": snake.New,
+}
+
+var Matchers map[string]*MatchMaker
 
 const (
 	FIND_GAME   = iota
@@ -30,14 +36,22 @@ type MatchMakerEvent struct {
 }
 
 type MatchMaker struct {
-	games  map[string]game.Game
-	Events chan *MatchMakerEvent `json:"-"`
+	gameGenerator func() game.Game
+	games         map[string]game.Game
+	Events        chan *MatchMakerEvent `json:"-"`
 }
 
-func NewMatchMaker() *MatchMaker {
+func init() {
+	for name, _ := range Games {
+		Matchers[name] = NewMatchMaker(name)
+	}
+}
+
+func NewMatchMaker(name string) *MatchMaker {
 	ret := &MatchMaker{
-		games:  make(map[string]game.Game),
-		Events: make(chan *MatchMakerEvent, 0),
+		gameGenerator: Games[name],
+		games:         make(map[string]game.Game),
+		Events:        make(chan *MatchMakerEvent, 0),
 	}
 	go ret.run()
 	return ret
@@ -61,7 +75,7 @@ func (m *MatchMaker) joinGame(gameToken string, playerToken string) game.Game {
 }
 
 func (m *MatchMaker) newGame() (game.Game, string) {
-	space := space.New()
+	space := m.gameGenerator()
 	token := Token()
 	m.games[token] = space
 	return space, token
@@ -107,8 +121,10 @@ func (m *MatchMaker) run() {
 }
 
 func serveMatchMaker(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.Error(w, "Not found", 404)
+	gameName := r.URL.Path[1:]
+
+	if _, ok := Games[gameName]; !ok {
+		http.Error(w, "Game not found", 404)
 		return
 	}
 
@@ -128,7 +144,7 @@ func serveMatchMaker(w http.ResponseWriter, r *http.Request) {
 		PlayerToken: playerToken,
 	}
 
-	Matcher.Events <- request
+	Matchers[gameName].Events <- request
 	match := <-response
 
 	http.Redirect(w, r, fmt.Sprintf("/game/%s", match.GameToken), 302)
