@@ -61,12 +61,12 @@ type Bullet struct {
 }
 
 type Space struct {
-	Events       chan *game.Event
+	Events       chan *game.Event       `json:"-"`
 	Players      map[int]*PlayerContext `json:"-"`
 	Bullets      []*Bullet              `json:"-"`
 	PlayerCount  int
 	nextPlayerId int
-	timerChan    chan bool
+	timerChan    chan bool `json:"-"`
 }
 
 type SerializedGame struct {
