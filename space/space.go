@@ -16,10 +16,10 @@ const (
 
 const (
 	MAX_PLAYERS              = 6
-	MAXSPEED                 = 5.0
+	MAXSPEED                 = 6.0
 	MAXBULLETS               = 3
 	FRAMES_TILL_NEXT_SHOT    = 4
-	BULLET_SPEED             = 10.0
+	BULLET_SPEED             = 14.0
 	MAX_DISCONNECTED_SECONDS = 5
 	DEATH_SECONDS            = 1
 	BULLET_LIFE_FRAMES       = 25
